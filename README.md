@@ -23,5 +23,8 @@ The all project was coded under PEP-8 (https://peps.python.org/pep-0008/) and fl
 
 ## Screenshot
 
+![alt text](https://raw.githubusercontent.com/HippolyteGuigon/Transformer_architecture_implementation/main/ressources/transformer_architecture.webp)
+
+Transformer architecture as described in the original paper
 
 ## How to use ?
