@@ -1,4 +1,6 @@
 import torch
+import torch.nn as nn
+
 from abc import ABC, abstractmethod
 from typing import List, Dict
 
@@ -61,6 +63,48 @@ class DataPreprocessor:
         sentences_indices = torch.tensor(indices)
 
         return sentences_indices
+
+
+class Embedding(nn.Module):
+    """
+    The goal of this class is to embed
+    the input sequences before they are
+    fed into the model
+
+    Arguments:
+        -num_embeddings: int: The total
+        vocabulary size
+        -embedding_dim: int: The dimension
+        of the embedding
+    Returns:
+        -None
+    """
+
+    def __init__(self, 
+                 num_embeddings: int = 10000, 
+                 embedding_dim: int = 512) -> None:
+        super().__init__()
+        self.embedding = nn.Embedding(
+            num_embeddings=num_embeddings, embedding_dim=embedding_dim
+        )
+
+    def embed(self, sentences_indices: torch.tensor) -> torch.tensor:
+        """
+        The goal of this method is to
+        embed sequences once word index
+        has been created
+
+        Arguments:
+            -sentences_indices: torch.tensor: The
+            sentence indices which are to be embedded
+        Returns:
+            -embedded: torch.tensor: The
+            embedding tensor
+        """
+
+        embedded = self.embedding(sentences_indices)
+
+        return embedded
 
 
 class PositionalEncoding(ABC):
