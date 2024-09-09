@@ -21,6 +21,7 @@ class DataPreprocessor:
     def __init__(self, sentences: List[str]) -> None:
         self.sentences = sentences
         self.word_to_index = self._create_word_index()
+        self.max_len = max(len(sentence.split()) for sentence in sentences)
 
     def _create_word_index(self) -> Dict[str, int]:
         """
@@ -38,7 +39,8 @@ class DataPreprocessor:
 
         all_words = [w for vocab in self.sentences for w in vocab.split()]
         unique_words = list(set(all_words))
-        word_to_index = {w: i for i, w in enumerate(unique_words)}
+        word_to_index = {w: i + 1 for i, w in enumerate(unique_words)}
+        word_to_index["<padding>"] = 0
 
         return word_to_index
 
@@ -58,9 +60,11 @@ class DataPreprocessor:
 
         indices = [
             [self.word_to_index[word] for word in sentence.split()]
+            + [self.word_to_index["<padding>"]]
+            * (self.max_len - len(sentence.split()))
             for sentence in self.sentences
         ]
-        sentences_indices = torch.tensor(indices)
+        sentences_indices = torch.tensor(indices, dtype=torch.long)
 
         return sentences_indices
 
