@@ -80,9 +80,9 @@ class Embedding(nn.Module):
         -None
     """
 
-    def __init__(self, 
-                 num_embeddings: int = 10000, 
-                 embedding_dim: int = 512) -> None:
+    def __init__(
+        self, num_embeddings: int = 10000, embedding_dim: int = 512
+    ) -> None:
         super().__init__()
         self.embedding = nn.Embedding(
             num_embeddings=num_embeddings, embedding_dim=embedding_dim
