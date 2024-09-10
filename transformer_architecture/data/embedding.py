@@ -1,8 +1,12 @@
 import torch
 import torch.nn as nn
 
+import warnings
+
 from abc import ABC, abstractmethod
 from typing import List, Dict
+
+warnings.filterwarnings("ignore")
 
 
 class DataPreprocessor:
@@ -129,6 +133,7 @@ class PositionalEncoding(ABC):
     def __init__(self, max_len: int, embedding_dim: int) -> None:
         self.max_len = max_len
         self.embedding_dim = embedding_dim
+        self.pe = self._init_positional_encoding()
 
     @abstractmethod
     def _init_positional_encoding(self) -> torch.tensor:
@@ -159,7 +164,7 @@ class PositionalEncoding(ABC):
             to which positional encoding will
             be added
         Returns:
-            -data: torch.tensor: The data once
+            -encoded_data: torch.tensor: The data once
             transformed with positional encoding
         """
 
