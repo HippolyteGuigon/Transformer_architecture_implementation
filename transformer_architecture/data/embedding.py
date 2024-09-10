@@ -118,17 +118,41 @@ class PositionalEncoding(ABC):
     for the embedding part of the Transformer
 
     Arguments:
-        -None
+        -max_len: int: The maximum size of the
+        input sequence
+        -embedding_dim: int: The embedding size of
+        the input sequence
     Returns:
         -None
     """
+
+    def __init__(self, max_len: int, embedding_dim: int) -> None:
+        self.max_len = max_len
+        self.embedding_dim = embedding_dim
+
+    @abstractmethod
+    def _init_positional_encoding(self) -> torch.tensor:
+        """
+        The goal of this class is to
+        compute the positional encoding
+        before applying it to the embedded
+        sequence
+
+        Arguments:
+            -None
+        Returns:
+            -pe: torch.tensor: The positional
+            encoding of the tensor
+        """
+
+        pass
 
     @abstractmethod
     def add_positional_encoding(self, data: torch.tensor) -> torch.tensor:
         """
         The goal of this abstract method is to
-        compute positional encoding and add it
-        to the input data
+        add positional encoding to the input
+        sequence
 
         Arguments:
             -data: torch.tensor: The input data
