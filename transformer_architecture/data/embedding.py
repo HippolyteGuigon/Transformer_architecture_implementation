@@ -203,14 +203,16 @@ class SinusoidalPositionalEncoding(PositionalEncoding):
             encoding tensor
         """
 
-        position = torch.arange(0, self.max_len).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, self.embedding_dim, 2)
-            * (-math.log(10000) / self.embedding_dim)
-        )
-        pe = torch.zeros(size=(self.max_len, self.embedding_dim))
-        pe[:, ::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
+        with torch.no_grad():
+            position = torch.arange(0, self.max_len).unsqueeze(1)
+            div_term = torch.exp(
+                torch.arange(0, self.embedding_dim, 2)
+                * (-math.log(10000) / self.embedding_dim)
+            )
+            pe = torch.zeros(size=(self.max_len, self.embedding_dim))
+            pe[:, ::2] = torch.sin(position * div_term)
+            pe[:, 1::2] = torch.cos(position * div_term)
+            del position, div_term
 
         return pe
 
