@@ -1,8 +1,13 @@
+import math
 import torch
 import torch.nn as nn
 
+import warnings
+
 from abc import ABC, abstractmethod
 from typing import List, Dict
+
+warnings.filterwarnings("ignore")
 
 
 class DataPreprocessor:
@@ -118,25 +123,114 @@ class PositionalEncoding(ABC):
     for the embedding part of the Transformer
 
     Arguments:
-        -None
+        -max_len: int: The maximum size of the
+        input sequence
+        -embedding_dim: int: The embedding size of
+        the input sequence
     Returns:
         -None
     """
+
+    def __init__(self, max_len: int, embedding_dim: int) -> None:
+        self.max_len = max_len
+        self.embedding_dim = embedding_dim
+        self.pe = self._init_positional_encoding()
+
+    @abstractmethod
+    def _init_positional_encoding(self) -> torch.tensor:
+        """
+        The goal of this class is to
+        compute the positional encoding
+        before applying it to the embedded
+        sequence
+
+        Arguments:
+            -None
+        Returns:
+            -pe: torch.tensor: The positional
+            encoding of the tensor
+        """
+
+        pass
 
     @abstractmethod
     def add_positional_encoding(self, data: torch.tensor) -> torch.tensor:
         """
         The goal of this abstract method is to
-        compute positional encoding and add it
-        to the input data
+        add positional encoding to the input
+        sequence
 
         Arguments:
             -data: torch.tensor: The input data
             to which positional encoding will
             be added
         Returns:
-            -data: torch.tensor: The data once
+            -encoded_data: torch.tensor: The data once
             transformed with positional encoding
         """
 
         pass
+
+
+class SinusoidalPositionalEncoding(PositionalEncoding):
+
+    """
+    The goal of this class is to implement
+    the sinusoidal positionnal encoding to
+    a sequence once it has been embedded
+
+    Arguments:
+        -None
+    Returns:
+        -None
+    """
+
+    def __init__(self, max_len: int, embedding_dim: int) -> None:
+        super().__init__(max_len=max_len, embedding_dim=embedding_dim)
+        self.max_len = max_len
+        self.embedding_dim = embedding_dim
+
+    def _init_positional_encoding(self) -> torch.tensor:
+        """
+        The goal of this method is to compute
+        the sinusoidal positional encoding and
+        add it to the data
+
+        Arguments:
+            -None
+        Returns:
+            -pe: torch.tensor: The positional
+            encoding tensor
+        """
+
+        with torch.no_grad():
+            position = torch.arange(0, self.max_len).unsqueeze(1)
+            div_term = torch.exp(
+                torch.arange(0, self.embedding_dim, 2)
+                * (-math.log(10000) / self.embedding_dim)
+            )
+            pe = torch.zeros(size=(self.max_len, self.embedding_dim))
+            pe[:, ::2] = torch.sin(position * div_term)
+            pe[:, 1::2] = torch.cos(position * div_term)
+            del position, div_term
+
+        return pe
+
+    def add_positional_encoding(self, data: torch.tensor) -> torch.tensor:
+        """
+        The goal of this abstract method is to
+        add positional encoding to the input
+        sequence
+
+        Arguments:
+            -data: torch.tensor: The input data
+            to which positional encoding will
+            be added
+        Returns:
+            -encoded_data: torch.tensor: The data once
+            transformed with positional encoding
+        """
+
+        encoded_data = data + self.pe
+
+        return encoded_data
