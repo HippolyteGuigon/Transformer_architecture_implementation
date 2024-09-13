@@ -1,7 +1,9 @@
 import torch
 
+from typing import Optional
 
-def softmax(x: torch.tensor) -> torch.tensor:
+
+def softmax(x: torch.tensor, axis: Optional[int] = None) -> torch.tensor:
     """
     The goal of this function is to
     implement the softmax function
@@ -10,14 +12,21 @@ def softmax(x: torch.tensor) -> torch.tensor:
     Arguments:
         -x: torch.tensor: The neuron
         to be activated
+        -axis: Optional[int]: The axis
+        along which the max operation
+        should be applied
     Returns:
         -softmax_result: torch.tensor:
         The neuron output once activated
     """
 
-    shift_x = x - torch.max(x)
+    if axis is None:
+        x = x.view(-1)
+        axis = 1
+
+    shift_x = x - torch.max(x, dim=axis, keepdims=True)[0]
     numerator = torch.exp(shift_x)
-    denominator = torch.sum(torch.exp(shift_x))
+    denominator = torch.sum(torch.exp(shift_x), dim=axis, keepdims=True)
 
     softmax_result = numerator / denominator
 
