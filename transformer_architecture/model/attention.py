@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 from abc import ABC, abstractmethod
+from transformer_architecture.utils.activation import softmax
 
 
 class Attention(ABC, nn.Module):
@@ -23,10 +24,11 @@ class Attention(ABC, nn.Module):
 
     @abstractmethod
     def forward(
-        self, key: torch.tensor, 
-            query: torch.tensor, 
-            value: torch.tensor,
-            masking: bool=False
+        self,
+        key: torch.tensor,
+        query: torch.tensor,
+        value: torch.tensor,
+        masking: bool = False,
     ) -> torch.tensor:
         """
         The goal of this method is to calculate
@@ -40,8 +42,8 @@ class Attention(ABC, nn.Module):
             of the input
             -value: torch.tensor: The value tensor
             of the input
-            -masking: bool: Wether the attention matrix 
-            is masked 
+            -masking: bool: Wether the attention matrix
+            is masked
         Returns:
             -attention_score: torch.tensor: The results
             for the attention values
@@ -66,11 +68,11 @@ class SelfAttention(Attention):
         super(SelfAttention).__init__()
 
     def forward(
-        self, 
-        key: torch.tensor, 
-        query: torch.tensor, 
-        value: torch.tensor, 
-        masking: bool=False
+        self,
+        key: torch.tensor,
+        query: torch.tensor,
+        value: torch.tensor,
+        masking: bool = False,
     ) -> torch.tensor:
         """
         The goal of this method is to calculate
@@ -84,11 +86,18 @@ class SelfAttention(Attention):
             of the input
             -value: torch.tensor: The value tensor
             of the input
-            -masking: bool: Wether the attention matrix 
+            -masking: bool: Wether the attention matrix
             is masked
         Returns:
             -attention_score: torch.tensor: The attention
             score output
         """
 
-        pass
+        d_k = key.size()[-1]
+
+        dot_product = torch.matmul(query, key.transpose(-2, -1))
+        scaled_dot_product = dot_product / torch.sqrt(d_k)
+        attention_scores = softmax(scaled_dot_product, axis=-1)
+        attention_scores = torch.matmul(attention_scores, value)
+
+        return attention_scores
