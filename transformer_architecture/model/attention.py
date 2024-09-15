@@ -103,9 +103,7 @@ class SelfAttention(Attention):
         value = self.value_layer(embeddings)
 
         dot_product = torch.matmul(query, key.transpose(-2, -1))
-        scaled_dot_product = dot_product / math.sqrt(
-            torch.tensor(self.d_k, dtype=torch.float32)
-        )
+        scaled_dot_product = dot_product / math.sqrt(self.d_k)
 
         if masking:
             mask_size = key.size(-2)
