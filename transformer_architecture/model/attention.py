@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 
@@ -59,33 +60,37 @@ class SelfAttention(Attention):
     mechanism
 
     Arguments:
-        -None
+        -embedding_dim: int: The
+        dimension of the embedding
+        input
+        -d_k: int: The dimension of
+        the key matrix
+        -d_v: int: The dimension of
+        the value matrix
     Returns:
         -None
     """
 
-    def __init__(self) -> None:
+    def __init__(self, embedding_dim: int, d_k: int, d_v: int) -> None:
         super().__init__()
+        self.query_layer = nn.Linear(embedding_dim, d_k)
+        self.key_layer = nn.Linear(embedding_dim, d_k)
+        self.value_layer = nn.Linear(embedding_dim, d_v)
+        self.d_k = d_k
 
     def forward(
         self,
-        key: torch.tensor,
-        query: torch.tensor,
-        value: torch.tensor,
+        embeddings: torch.tensor,
         masking: bool = False,
     ) -> torch.tensor:
         """
         The goal of this method is to calculate
         the self-attention scores for a given
-        input
+        embedding input
 
         Arguments:
-            -key: torch.tensor: The key tensor of
-            the input
-            -query: torch.tensor: The query tensor
-            of the input
-            -value: torch.tensor: The value tensor
-            of the input
+            -embeddings: torch.tensor: The embedding
+            input
             -masking: bool: Wether the attention matrix
             is masked
         Returns:
@@ -93,11 +98,13 @@ class SelfAttention(Attention):
             score output
         """
 
-        d_k = key.size(-1)
+        query = self.query_layer(embeddings)
+        key = self.key_layer(embeddings)
+        value = self.value_layer(embeddings)
 
         dot_product = torch.matmul(query, key.transpose(-2, -1))
-        scaled_dot_product = dot_product / torch.sqrt(
-            torch.tensor(d_k, dtype=torch.float32)
+        scaled_dot_product = dot_product / math.sqrt(
+            torch.tensor(self.d_k, dtype=torch.float32)
         )
 
         if masking:

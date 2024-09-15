@@ -6,6 +6,7 @@ from transformer_architecture.preprocessing.embedding import (
     Embedding,
 )
 from transformer_architecture.utils.activation import softmax
+from transformer_architecture.model.attention import SelfAttention
 
 
 class Test(unittest.TestCase):
@@ -84,6 +85,66 @@ class Test(unittest.TestCase):
         is_valid = torch.allclose(softmax_results, valid_output)
 
         self.assertTrue(is_valid)
+
+    def test_self_attention_mechanism(self) -> None:
+        """
+        The goal of this test is to check if
+        the self-attention mechanism that was
+        implemented returns accurate results
+        when given a random output
+
+        Arguments:
+            -None
+        Returns:
+            -None
+        """
+
+        embedding_dim = 512
+        key_dimension = 100
+        value_dimension = 512
+
+        embedder = Embedding(embedding_dim=embedding_dim)
+        attention_head = SelfAttention(
+            embedding_dim=embedding_dim, d_k=key_dimension, d_v=value_dimension
+        )
+
+        sentences = [
+            "I love cats",
+            "I hate dogs and birds",
+            "Cats are cute",
+            "Dogs are loyal",
+        ]
+
+        number_sentences = len(sentences)
+        longest_sentence_word = max(len(s.split()) for s in sentences)
+
+        preprocessor = DataPreprocessor(sentences)
+
+        sentence_indices = preprocessor.get_indices()
+        embeddings = embedder.embed(sentence_indices)
+
+        attention_output = attention_head.forward(embeddings)
+
+        attention_output_size = attention_output.size()
+
+        self.assertEqual(
+            number_sentences,
+            attention_output_size[0],
+            "Attention value output mismatches the\
+                number of sentences in its final dimensions",
+        )
+        self.assertEqual(
+            longest_sentence_word,
+            attention_output_size[1],
+            "Attention value output mismatches the\
+                longest sentence word in its final dimensions",
+        )
+        self.assertEqual(
+            embedding_dim,
+            attention_output_size[2],
+            "Attention value output mismatches the\
+                input embedding dimension in its final dimensions",
+        )
 
 
 if __name__ == "__main__":
