@@ -20,7 +20,7 @@ class Attention(ABC, nn.Module):
     """
 
     def __init__(self) -> None:
-        super(Attention, self).__init__()
+        super().__init__()
 
     @abstractmethod
     def forward(
@@ -65,7 +65,7 @@ class SelfAttention(Attention):
     """
 
     def __init__(self) -> None:
-        super(SelfAttention).__init__()
+        super().__init__()
 
     def forward(
         self,
@@ -93,10 +93,22 @@ class SelfAttention(Attention):
             score output
         """
 
-        d_k = key.size()[-1]
+        d_k = key.size(-1)
 
         dot_product = torch.matmul(query, key.transpose(-2, -1))
-        scaled_dot_product = dot_product / torch.sqrt(d_k)
+        scaled_dot_product = dot_product / torch.sqrt(
+            torch.tensor(d_k, dtype=torch.float32)
+        )
+
+        if masking:
+            mask_size = key.size(-2)
+            mask = torch.triu(
+                torch.ones(mask_size, mask_size, device=key.device), diagonal=1
+            )
+            scaled_dot_product = scaled_dot_product.masked_fill(
+                mask == 1, float("-inf")
+            )
+
         attention_scores = softmax(scaled_dot_product, axis=-1)
         attention_scores = torch.matmul(attention_scores, value)
 
