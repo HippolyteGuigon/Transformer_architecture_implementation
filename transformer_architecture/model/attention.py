@@ -26,27 +26,27 @@ class Attention(ABC, nn.Module):
     @abstractmethod
     def forward(
         self,
-        key: torch.tensor,
-        query: torch.tensor,
-        value: torch.tensor,
+        key: torch.Tensor,
+        query: torch.Tensor,
+        value: torch.Tensor,
         masking: bool = False,
-    ) -> torch.tensor:
+    ) -> torch.Tensor:
         """
         The goal of this method is to calculate
         the self-attention scores for a given
         input
 
         Arguments:
-            -key: torch.tensor: The key tensor of
+            -key: torch.Tensor: The key tensor of
             the input
-            -query: torch.tensor: The query tensor
+            -query: torch.Tensor: The query tensor
             of the input
-            -value: torch.tensor: The value tensor
+            -value: torch.Tensor: The value tensor
             of the input
             -masking: bool: Wether the attention matrix
             is masked
         Returns:
-            -attention_score: torch.tensor: The results
+            -attention_score: torch.Tensor: The results
             for the attention values
         """
 
@@ -80,21 +80,21 @@ class SelfAttention(Attention):
 
     def forward(
         self,
-        embeddings: torch.tensor,
+        embeddings: torch.Tensor,
         masking: bool = False,
-    ) -> torch.tensor:
+    ) -> torch.Tensor:
         """
         The goal of this method is to calculate
         the self-attention scores for a given
         embedding input
 
         Arguments:
-            -embeddings: torch.tensor: The embedding
+            -embeddings: torch.Tensor: The embedding
             input
             -masking: bool: Wether the attention matrix
             is masked
         Returns:
-            -attention_score: torch.tensor: The attention
+            -attention_score: torch.Tensor: The attention
             score output
         """
 
