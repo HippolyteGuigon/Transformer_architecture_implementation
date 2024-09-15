@@ -1,6 +1,11 @@
 import unittest
+import torch
 
-from transformer_architecture.data.embedding import DataPreprocessor, Embedding
+from transformer_architecture.preprocessing.embedding import (
+    DataPreprocessor,
+    Embedding,
+)
+from transformer_architecture.utils.activation import softmax
 
 
 class Test(unittest.TestCase):
@@ -55,6 +60,30 @@ class Test(unittest.TestCase):
         self.assertEqual(
             embedding_dim, embedded_dim[2], "Mismatch in embedding dimensions"
         )
+
+    def test_activation_function(self) -> None:
+        """
+        The goal of this function is to
+        test if the activation functions
+        return appropriate results (equal 1)
+        when given a neuron
+
+        Arguments:
+            -None
+        Returns:
+            -None
+        """
+
+        test_size = 10000
+
+        test_neuron = torch.rand(size=(test_size, 10))
+        valid_output = torch.ones(size=(test_size,))
+
+        softmax_results = torch.sum(softmax(x=test_neuron, axis=1), dim=1)
+
+        is_valid = torch.allclose(softmax_results, valid_output)
+
+        self.assertTrue(is_valid)
 
 
 if __name__ == "__main__":
