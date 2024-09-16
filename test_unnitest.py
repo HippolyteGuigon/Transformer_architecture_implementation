@@ -2,7 +2,6 @@ import unittest
 import torch
 import nltk
 
-from nltk.corpus import gutenberg
 from nltk.tokenize import sent_tokenize
 from nltk.corpus import webtext
 
@@ -13,9 +12,7 @@ from transformer_architecture.preprocessing.embedding import (
 from transformer_architecture.utils.activation import softmax
 from transformer_architecture.model.attention import MultiHeadAttention
 
-nltk.download("gutenberg")
-nltk.download("punkt_tab")
-nltk.download("punkt")
+nltk.download("webtext")
 
 
 class Test(unittest.TestCase):
@@ -36,8 +33,6 @@ class Test(unittest.TestCase):
         Returns:
             -None
         """
-
-        nltk.download("webtext")
 
         text = webtext.raw("pirates.txt")
         sentences = sent_tokenize(text)
@@ -117,7 +112,7 @@ class Test(unittest.TestCase):
             embedding_dim, num_heads, key_dimension, value_dimension
         )
 
-        text = gutenberg.raw("austen-emma.txt")
+        text = webtext.raw("pirates.txt")
 
         sentences = sent_tokenize(text)
 
