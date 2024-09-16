@@ -12,6 +12,7 @@ from transformer_architecture.preprocessing.embedding import (
 from transformer_architecture.utils.activation import softmax
 from transformer_architecture.model.attention import MultiHeadAttention
 
+nltk.download("punkt_tab")
 nltk.download("webtext")
 
 
