@@ -6,7 +6,7 @@ from transformer_architecture.preprocessing.embedding import (
     Embedding,
 )
 from transformer_architecture.utils.activation import softmax
-from transformer_architecture.model.attention import SelfAttention
+from transformer_architecture.model.attention import MultiHeadAttention
 
 
 class Test(unittest.TestCase):
@@ -102,10 +102,12 @@ class Test(unittest.TestCase):
         embedding_dim = 512
         key_dimension = 100
         value_dimension = 512
+        num_heads = 64
 
         embedder = Embedding(embedding_dim=embedding_dim)
-        attention_head = SelfAttention(
-            embedding_dim=embedding_dim, d_k=key_dimension, d_v=value_dimension
+
+        multi_head_attention = MultiHeadAttention(
+            embedding_dim, num_heads, key_dimension, value_dimension
         )
 
         sentences = [
@@ -123,7 +125,11 @@ class Test(unittest.TestCase):
         sentence_indices = preprocessor.get_indices()
         embeddings = embedder.embed(sentence_indices)
 
-        attention_output = attention_head.forward(embeddings)
+        key, query, value = multi_head_attention._create_attention_matrices(
+            embeddings
+        )
+
+        attention_output = multi_head_attention.forward(key, query, value)
 
         attention_output_size = attention_output.size()
 
