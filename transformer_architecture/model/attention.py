@@ -112,3 +112,30 @@ class SelfAttention(Attention):
         attention_scores = torch.matmul(attention_scores, value)
 
         return attention_scores
+
+
+class MultiHeadAttention(SelfAttention):
+    """
+    The goal of this class is to
+    implement the multi-head attention
+    mechanism
+
+    Arguments:
+        -embedding_dim: int: The
+        dimension of the embedding
+        input
+        -num_heads: int: The number of
+        attention heads
+        -d_k: int: The dimension of
+        the key matrix
+        -d_v: int: The dimension of
+        the value matrix
+    Returns:
+        -None
+    """
+
+    def __init__(
+        self, embedding_dim: int, num_heads: int, d_k: int, d_v: int
+    ) -> None:
+        super().__init__(embedding_dim, d_k, d_v)
+        self.num_heads = num_heads
