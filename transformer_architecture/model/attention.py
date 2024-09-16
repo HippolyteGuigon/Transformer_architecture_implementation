@@ -26,9 +26,7 @@ class Attention(ABC, nn.Module):
     @abstractmethod
     def forward(
         self,
-        key: torch.Tensor,
-        query: torch.Tensor,
-        value: torch.Tensor,
+        embeddings: torch.Tensor,
         masking: bool = False,
     ) -> torch.Tensor:
         """
@@ -37,12 +35,8 @@ class Attention(ABC, nn.Module):
         input
 
         Arguments:
-            -key: torch.Tensor: The key tensor of
-            the input
-            -query: torch.Tensor: The query tensor
-            of the input
-            -value: torch.Tensor: The value tensor
-            of the input
+            -embeddings: torch.Tensor: The embedding
+            input
             -masking: bool: Wether the attention matrix
             is masked
         Returns:
