@@ -2,7 +2,6 @@ import math
 import torch
 import torch.nn as nn
 
-from typing import Tuple
 from abc import ABC, abstractmethod
 from transformer_architecture.utils.activation import softmax
 
@@ -144,9 +143,7 @@ class MultiHeadAttention(SelfAttention):
         ), "The number of heads must be divisible\
             by the dimension of the embedding"
 
-    def _create_attention_matrices(
-        self, embeddings: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _create_attention_matrices(self, embeddings: torch.Tensor) -> None:
         """
         The goal of this method is to create
         the key, query and value matrices
@@ -158,19 +155,12 @@ class MultiHeadAttention(SelfAttention):
             -embeddings: torch.Tensor: The
             input embeddings
         Returns
-            -key: torch.Tensor: The key
-            matrix
-            -query: torch.Tensor: The query
-            matrix
-            -value: torch.Tensor: The value
-            matrix
+            None
         """
 
-        query = self.query_layer(embeddings)
-        key = self.key_layer(embeddings)
-        value = self.value_layer(embeddings)
-
-        return key, query, value
+        self.query = self.query_layer(embeddings)
+        self.key = self.key_layer(embeddings)
+        self.value = self.value_layer(embeddings)
 
     def split_heads(self) -> None:
         pass
