@@ -1,5 +1,10 @@
 import unittest
 import torch
+import nltk
+
+from nltk.corpus import gutenberg
+from nltk.tokenize import sent_tokenize
+from nltk.corpus import webtext
 
 from transformer_architecture.preprocessing.embedding import (
     DataPreprocessor,
@@ -28,12 +33,11 @@ class Test(unittest.TestCase):
             -None
         """
 
-        sentences = [
-            "I love cats",
-            "I hate dogs and birds",
-            "Cats are cute",
-            "Dogs are loyal",
-        ]
+        nltk.download("punkt")
+        nltk.download("webtext")
+
+        text = webtext.raw("pirates.txt")
+        sentences = sent_tokenize(text)
 
         embedding_dim = 512
 
@@ -110,12 +114,9 @@ class Test(unittest.TestCase):
             embedding_dim, num_heads, key_dimension, value_dimension
         )
 
-        sentences = [
-            "I love cats",
-            "I hate dogs and birds",
-            "Cats are cute",
-            "Dogs are loyal",
-        ]
+        text = gutenberg.raw("austen-emma.txt")
+
+        sentences = sent_tokenize(text)
 
         number_sentences = len(sentences)
         longest_sentence_word = max(len(s.split()) for s in sentences)
@@ -125,11 +126,13 @@ class Test(unittest.TestCase):
         sentence_indices = preprocessor.get_indices()
         embeddings = embedder.embed(sentence_indices)
 
-        key, query, value = multi_head_attention._create_attention_matrices(
-            embeddings
-        )
+        multi_head_attention._create_attention_matrices(embeddings)
 
-        attention_output = multi_head_attention.forward(key, query, value)
+        attention_output = multi_head_attention.forward(
+            multi_head_attention.key,
+            multi_head_attention.query,
+            multi_head_attention.value,
+        )
 
         attention_output_size = attention_output.size()
 
