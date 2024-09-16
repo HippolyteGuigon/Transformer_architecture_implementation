@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - "*"
-      - "features/self_attention"
   pull_request:
     branches:
       - "*"
-      - "features/self_attention"
 
 permissions:
   contents: read
