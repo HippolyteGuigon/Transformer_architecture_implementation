@@ -13,6 +13,9 @@ from transformer_architecture.preprocessing.embedding import (
 from transformer_architecture.utils.activation import softmax
 from transformer_architecture.model.attention import MultiHeadAttention
 
+nltk.download("punkt_tab")
+nltk.download("punkt")
+
 
 class Test(unittest.TestCase):
     """
@@ -33,7 +36,6 @@ class Test(unittest.TestCase):
             -None
         """
 
-        nltk.download("punkt")
         nltk.download("webtext")
 
         text = webtext.raw("pirates.txt")
