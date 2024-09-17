@@ -194,6 +194,32 @@ class MultiHeadAttention(SelfAttention):
 
         return Q_heads, K_heads, V_heads
 
-    def forward(self, key, query, value):
+    def forward(self, key, query, value) -> torch.Tensor:
+        """
+        The goal of this function is to
+        compute the self-attention score
+        for all attention heads before
+        concatenating the result
+
+        Arguments:
+            -key: torch.Tensor: The key
+            matrices of the attention
+            heads
+            -query: torch.Tensor: The
+            query matrices of the attention
+            heads
+            -value: torch.Tensor: The value
+            matrices of the attention heads
+        Returns:
+            -attention_scores: torch.Tensor:
+            The concatenated results of the
+            attention score for each attention
+            head
+        """
+
         attention_scores = super().forward(key, query, value)
+        batch_size, seq_len, _, _ = attention_scores.size()
+
+        attention_scores = attention_scores.view(batch_size, seq_len, -1)
+
         return attention_scores
