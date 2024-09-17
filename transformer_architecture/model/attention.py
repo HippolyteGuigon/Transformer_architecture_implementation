@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 
+from typing import Tuple
 from abc import ABC, abstractmethod
 from transformer_architecture.utils.activation import softmax
 
@@ -135,6 +136,7 @@ class MultiHeadAttention(SelfAttention):
         self.value_layer = nn.Linear(embedding_dim, d_v)
 
         self.d_k = d_k
+        self.d_v = d_v
         self.num_heads = num_heads
         self.embedding_dim = embedding_dim
 
@@ -162,8 +164,35 @@ class MultiHeadAttention(SelfAttention):
         self.key = self.key_layer(embeddings)
         self.value = self.value_layer(embeddings)
 
-    def split_heads(self) -> None:
-        pass
+    def split_heads(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        The goal of this method is to
+        split the key, query, value
+        tensor between the different
+        attention heads
+
+        Arguments:
+            -None
+        Returns:
+            -Q_heads: torch.Tensor: Splitted
+            query attention head
+            -K_heads: torch.Tensor: Splitted
+            key attention head
+            -V_heads: Splitted value attention
+            head
+        """
+
+        d_query = self.d_k // self.num_heads
+        d_key = self.d_k // self.num_heads
+        d_value = self.d_v // self.num_heads
+
+        batch_size, seq_len, _ = self.query.size()
+
+        Q_heads = self.query.view(batch_size, seq_len, self.num_heads, d_query)
+        K_heads = self.key.view(batch_size, seq_len, self.num_heads, d_key)
+        V_heads = self.value.view(batch_size, seq_len, self.num_heads, d_value)
+
+        return Q_heads, K_heads, V_heads
 
     def forward(self, key, query, value):
         attention_scores = super().forward(key, query, value)
