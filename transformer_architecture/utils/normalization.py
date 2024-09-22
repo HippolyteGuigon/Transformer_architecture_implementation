@@ -9,6 +9,8 @@ class NormalizationLayer:
     Architecture
 
     Arguments:
+        -normalized_shape: List[int]: The
+        shape of the element to be normalized
         -eps: Value added to the denominator
         for numerical stability
     Returns:
