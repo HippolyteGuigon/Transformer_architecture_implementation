@@ -218,7 +218,7 @@ class MultiHeadAttention(SelfAttention):
         """
 
         attention_scores = super().forward(key, query, value)
-        batch_size, seq_len, _, _ = attention_scores.size()
+        batch_size, seq_len, _ = attention_scores.size()
 
         attention_scores = attention_scores.view(batch_size, seq_len, -1)
 
