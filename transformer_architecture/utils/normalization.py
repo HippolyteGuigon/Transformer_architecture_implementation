@@ -16,8 +16,11 @@ class NormalizationLayer:
         -eps: Value added to the denominator
         for numerical stability
         -elementwise_affine: bool: If the normalization
-        should have learnable parameters Beta and Gamma
+        should have learnable parameter Gamma
         learnt during the process
+        -bias: bool: Only relevant if elementwise_affine
+        set to True, should a bias be learnt during the
+        normalization process
     Returns:
         -None
     """
@@ -27,14 +30,17 @@ class NormalizationLayer:
         normalized_shape: List[int],
         eps: float = 1e-05,
         elementwise_affine: bool = True,
+        bias: bool = True,
     ) -> None:
         self.eps = eps
 
         if elementwise_affine:
             elementwise_affine_dim = normalized_shape[-1]
-            self.alpha = torch.randn(
-                (elementwise_affine_dim), requires_grad=True
-            )
             self.gamma = torch.randn(
                 (elementwise_affine_dim), requires_grad=True
             )
+
+            if bias:
+                self.beta = torch.randn(
+                    (elementwise_affine_dim), requires_grad=True
+                )
