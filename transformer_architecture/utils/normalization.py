@@ -39,12 +39,12 @@ class NormalizationLayer:
 
         if self.elementwise_affine:
             elementwise_affine_dim = normalized_shape[-1]
-            self.gamma = torch.randn(
+            self.gamma = torch.ones(
                 (elementwise_affine_dim), requires_grad=True
             )
 
             if self.bias:
-                self.beta = torch.randn(
+                self.beta = torch.zeros(
                     (elementwise_affine_dim), requires_grad=True
                 )
 
@@ -63,9 +63,11 @@ class NormalizationLayer:
         """
 
         mean = torch.mean(input, dim=-1, keepdim=True)
-        standard_deviation = torch.std(input, dim=-1, keepdim=True)
+        standard_deviation = torch.std(
+            input, dim=-1, keepdim=True, unbiased=False
+        )
 
-        normalized_input = (input - mean) / standard_deviation
+        normalized_input = (input - mean) / (standard_deviation + self.eps)
 
         if self.elementwise_affine:
             normalized_input *= self.gamma
