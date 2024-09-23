@@ -131,9 +131,9 @@ class MultiHeadAttention(SelfAttention):
         self, embedding_dim: int, num_heads: int, d_k: int, d_v: int
     ) -> None:
         super().__init__()
-        self.query_layer = nn.Linear(embedding_dim, d_k)
-        self.key_layer = nn.Linear(embedding_dim, d_k)
-        self.value_layer = nn.Linear(embedding_dim, d_v)
+        self.query_layer = nn.Linear(embedding_dim, d_k * num_heads)
+        self.key_layer = nn.Linear(embedding_dim, d_k * num_heads)
+        self.value_layer = nn.Linear(embedding_dim, d_v * num_heads)
 
         self.d_k = d_k
         self.d_v = d_v
@@ -182,15 +182,15 @@ class MultiHeadAttention(SelfAttention):
             head
         """
 
-        d_query = self.d_k // self.num_heads
-        d_key = self.d_k // self.num_heads
-        d_value = self.d_v // self.num_heads
-
         batch_size, seq_len, _ = self.query.size()
 
-        Q_heads = self.query.view(batch_size, seq_len, self.num_heads, d_query)
-        K_heads = self.key.view(batch_size, seq_len, self.num_heads, d_key)
-        V_heads = self.value.view(batch_size, seq_len, self.num_heads, d_value)
+        Q_heads = self.query.view(
+            batch_size, self.num_heads, seq_len, self.d_k
+        )
+        K_heads = self.key.view(batch_size, self.num_heads, seq_len, self.d_k)
+        V_heads = self.value.view(
+            batch_size, self.num_heads, seq_len, self.d_v
+        )
 
         return Q_heads, K_heads, V_heads
 
@@ -218,8 +218,11 @@ class MultiHeadAttention(SelfAttention):
         """
 
         attention_scores = super().forward(key, query, value)
-        batch_size, seq_len, _ = attention_scores.size()
 
-        attention_scores = attention_scores.view(batch_size, seq_len, -1)
+        batch_size, _, seq_len, _ = attention_scores.size()
+
+        attention_scores = attention_scores.view(
+            batch_size, seq_len, self.num_heads * self.d_v
+        )
 
         return attention_scores
