@@ -103,14 +103,17 @@ class Test(unittest.TestCase):
         """
 
         embedding_dim = 512
-        key_dimension = 100
-        value_dimension = 512
-        num_heads = 64
+        key_dimension = 32
+        value_dimension = 16
+        num_heads = 8
 
         embedder = Embedding(embedding_dim=embedding_dim)
 
         multi_head_attention = MultiHeadAttention(
-            embedding_dim, num_heads, key_dimension, value_dimension
+            embedding_dim=embedding_dim,
+            num_heads=num_heads,
+            d_k=key_dimension,
+            d_v=value_dimension,
         )
 
         text = webtext.raw("pirates.txt")
@@ -127,10 +130,10 @@ class Test(unittest.TestCase):
 
         multi_head_attention._create_attention_matrices(embeddings)
 
+        Q, K, V = multi_head_attention.split_heads()
+
         attention_output = multi_head_attention.forward(
-            multi_head_attention.key,
-            multi_head_attention.query,
-            multi_head_attention.value,
+            key=K, query=Q, value=V
         )
 
         attention_output_size = attention_output.size()
@@ -148,10 +151,11 @@ class Test(unittest.TestCase):
                 longest sentence word in its final dimensions",
         )
         self.assertEqual(
-            embedding_dim,
+            num_heads * value_dimension,
             attention_output_size[2],
             "Attention value output mismatches the\
-                input embedding dimension in its final dimensions",
+                number of heads and value dimension\
+                    required",
         )
 
 

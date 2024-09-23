@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 
+from typing import Tuple
 from abc import ABC, abstractmethod
 from transformer_architecture.utils.activation import softmax
 
@@ -130,11 +131,12 @@ class MultiHeadAttention(SelfAttention):
         self, embedding_dim: int, num_heads: int, d_k: int, d_v: int
     ) -> None:
         super().__init__()
-        self.query_layer = nn.Linear(embedding_dim, d_k)
-        self.key_layer = nn.Linear(embedding_dim, d_k)
-        self.value_layer = nn.Linear(embedding_dim, d_v)
+        self.query_layer = nn.Linear(embedding_dim, d_k * num_heads)
+        self.key_layer = nn.Linear(embedding_dim, d_k * num_heads)
+        self.value_layer = nn.Linear(embedding_dim, d_v * num_heads)
 
         self.d_k = d_k
+        self.d_v = d_v
         self.num_heads = num_heads
         self.embedding_dim = embedding_dim
 
@@ -162,9 +164,65 @@ class MultiHeadAttention(SelfAttention):
         self.key = self.key_layer(embeddings)
         self.value = self.value_layer(embeddings)
 
-    def split_heads(self) -> None:
-        pass
+    def split_heads(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        The goal of this method is to
+        split the key, query, value
+        tensor between the different
+        attention heads
 
-    def forward(self, key, query, value):
+        Arguments:
+            -None
+        Returns:
+            -Q_heads: torch.Tensor: Splitted
+            query attention head
+            -K_heads: torch.Tensor: Splitted
+            key attention head
+            -V_heads: Splitted value attention
+            head
+        """
+
+        batch_size, seq_len, _ = self.query.size()
+
+        Q_heads = self.query.view(
+            batch_size, self.num_heads, seq_len, self.d_k
+        )
+        K_heads = self.key.view(batch_size, self.num_heads, seq_len, self.d_k)
+        V_heads = self.value.view(
+            batch_size, self.num_heads, seq_len, self.d_v
+        )
+
+        return Q_heads, K_heads, V_heads
+
+    def forward(self, key, query, value) -> torch.Tensor:
+        """
+        The goal of this function is to
+        compute the self-attention score
+        for all attention heads before
+        concatenating the result
+
+        Arguments:
+            -key: torch.Tensor: The key
+            matrices of the attention
+            heads
+            -query: torch.Tensor: The
+            query matrices of the attention
+            heads
+            -value: torch.Tensor: The value
+            matrices of the attention heads
+        Returns:
+            -attention_scores: torch.Tensor:
+            The concatenated results of the
+            attention score for each attention
+            head
+        """
+
         attention_scores = super().forward(key, query, value)
+
+        batch_size, _, seq_len, _ = attention_scores.size()
+
+        attention_scores = attention_scores.view(
+            batch_size, seq_len, self.num_heads * self.d_v
+        )
+
         return attention_scores
