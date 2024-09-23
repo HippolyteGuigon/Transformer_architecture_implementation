@@ -2,9 +2,13 @@ name: Python application
 
 on:
   push:
-    branches: [ "*" ]
+    branches:
+      - "*"
+      - "features/self_attention"
   pull_request:
-    branches: [ "*" ]
+    branches:
+      - "*"
+      - "features/self_attention"
 
 permissions:
   contents: read
