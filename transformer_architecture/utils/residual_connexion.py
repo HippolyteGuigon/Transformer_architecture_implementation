@@ -12,8 +12,6 @@ class ResidualConnection(nn.Module):
     layer output
 
     Arguments:
-        -X: torch.Tensor: The input
-        Tensor
         -in_dimensions: int: The dimensions
         of the input Tensor
         -out_dimensions: int: The dimensions
@@ -22,15 +20,19 @@ class ResidualConnection(nn.Module):
         -None
     """
 
-    def __init__(
-        self, X: torch.Tensor, in_dimensions: int, out_dimensions: int
-    ) -> None:
+    def __init__(self, in_dimensions: int, out_dimensions: int) -> None:
         super().__init__()
-        self.X = X
         self.in_dimensions = in_dimensions
         self.out_dimensions = out_dimensions
 
-    def forward(self, output: torch.Tensor) -> torch.Tensor:
+        if self.in_dimensions != self.out_dimensions:
+            self.downsample_layer = nn.Linear(
+                self.in_dimensions, self.out_dimensions
+            )
+        else:
+            self.downsample_layer = None
+
+    def forward(self, X: torch.Tensor, output: torch.Tensor) -> torch.Tensor:
         """
         The goal of this method is
         to add the input and output
@@ -38,6 +40,8 @@ class ResidualConnection(nn.Module):
         connexion
 
         Arguments:
+            -X: torch.Tensor: The tensor
+            to be added
             -output: torch.Tensor: The
             output of the layer
         Returns:
@@ -45,12 +49,9 @@ class ResidualConnection(nn.Module):
             The new Tensor after addition
         """
 
-        if self.in_dimensions != self.out_dimensions:
-            downsample_layer = nn.Linear(
-                self.in_dimensions, self.out_dimensions
-            )
-            downsampled_input = downsample_layer(self.X)
+        if self.downsample_layer:
+            X = self.downsample_layer(X)
 
-        residual_tensor = output + downsampled_input
+        residual_tensor = output + X
 
         return residual_tensor
