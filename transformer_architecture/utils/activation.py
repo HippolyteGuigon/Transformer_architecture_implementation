@@ -1,9 +1,10 @@
 import torch
+from torch import Tensor
 
 from typing import Optional
 
 
-def softmax(x: torch.tensor, axis: Optional[int] = None) -> torch.tensor:
+def softmax(x: Tensor, axis: Optional[int] = None) -> torch.tensor:
     """
     The goal of this function is to
     implement the softmax function
