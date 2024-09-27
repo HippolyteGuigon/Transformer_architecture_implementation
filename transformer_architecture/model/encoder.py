@@ -1,4 +1,8 @@
+from torch import Tensor
+from typing import Callable
+
 from transformer_architecture.model.attention import MultiHeadAttention
+from transformer_architecture.utils.activation import relu
 
 
 class TransformerEncoderLayer(MultiHeadAttention):
@@ -12,11 +16,36 @@ class TransformerEncoderLayer(MultiHeadAttention):
         input sequence (the embedding)
         -num_heads: int: The number of attention
         heads of the model
+        -dim_feedforward: int: The dimension of the
+        feedforward network model
+        -dropout: float: The dropout value
+        -activation: Callable[[Tensor], Tensor]: The
+        chosen activation function for the feed forward
+        neural network
+        -layer_norm_eps: float: The eps value in layer
+        normalization components
+        -batch_first: bool: If True, then the input and
+        output tensors are provided as (batch, seq, feature)
+        -norm_first: bool: If True, layer norm is done prior to
+        attention and feedforward operations, respectively
+        -biais:  If set to False, Linear and LayerNorm layers
+        will not learn an additive bias
     Returns:
         -None
     """
 
-    def __init__(self, d_model: int, num_heads: int) -> None:
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        dim_feedforward: int = 2048,
+        dropout: float = 0.1,
+        activation: Callable[[Tensor], Tensor] = relu,
+        layer_norm_eps: float = 1e-5,
+        batch_first: bool = False,
+        norm_first: bool = False,
+        bias: bool = True,
+    ) -> None:
         self.d_model = d_model
         self.num_heads = num_heads
 
