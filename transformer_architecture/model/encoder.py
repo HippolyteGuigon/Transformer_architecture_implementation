@@ -1,7 +1,7 @@
 from transformer_architecture.model.attention import MultiHeadAttention
 
 
-class TransformerEncoder(MultiHeadAttention):
+class TransformerEncoderLayer(MultiHeadAttention):
     """
     The goal of this class is to
     implement the Transformer encoder
