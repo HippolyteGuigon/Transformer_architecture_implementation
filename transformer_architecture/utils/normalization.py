@@ -1,5 +1,6 @@
 import torch
 
+from torch import Tensor
 from typing import List
 
 
@@ -48,17 +49,17 @@ class NormalizationLayer:
                     (elementwise_affine_dim), requires_grad=True
                 )
 
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         """
         The goal of this method is to implement the
         normalization layer process to an input
         tensor
 
         Arguments:
-            -input: torch.Tensor: The input Tensor to
+            -input: Tensor: The input Tensor to
             be normalized
         Returns:
-            -normalized_layer: torch.Tensor: The input
+            -normalized_layer: Tensor: The input
             after it was normalized
         """
 
