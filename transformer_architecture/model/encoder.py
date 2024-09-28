@@ -1,5 +1,5 @@
 from torch import Tensor
-from typing import Callable
+from typing import Callable, Optional
 
 from transformer_architecture.model.attention import MultiHeadAttention
 from transformer_architecture.utils.activation import relu
@@ -48,10 +48,16 @@ class TransformerEncoderLayer(MultiHeadAttention):
     ) -> None:
         self.d_model = d_model
         self.num_heads = num_heads
-
         self.d_v = self.d_model // self.num_heads
         self.d_k = self.d_model // self.num_heads
         self.d_q = self.d_model // self.num_heads
+        self.dim_feedforward = dim_feedforward
+        self.dropout = dropout
+        self.activation = activation
+        self.layer_norm_eps = layer_norm_eps
+        self.batch_first = batch_first
+        self.norm_first = norm_first
+        self.bias = bias
 
         super().__init__(
             embedding_dim=self.d_model,
@@ -59,3 +65,32 @@ class TransformerEncoderLayer(MultiHeadAttention):
             d_k=self.d_k,
             d_v=self.d_v,
         )
+
+    def forward(
+        self,
+        src: Tensor,
+        src_mask: Optional[Tensor] = None,
+        src_key_padding_mask: Optional[Tensor] = None,
+        is_casual: bool = False,
+    ) -> Tensor:
+        """
+        The goal of this method is
+        to pass the input through
+        the encoder layer
+
+        Arguments:
+            -src: Tensor: The sequence
+            to the encoder layer
+            -src_mask: Optional[Tensor]:
+            The mask for the src sequence
+            -src_key_padding_mask: Optional[Tensor]:
+            The mask for the src keys per batch
+            -is_causal: bool: If specified, applies
+            a causal mask as src mask
+        """
+
+        super()._create_attention_matrices(src)
+        Q, K, V = super().split_heads()
+        attention_output = super().forward(key=K, query=Q, value=V)
+
+        return attention_output
