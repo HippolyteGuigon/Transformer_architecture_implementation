@@ -1,5 +1,6 @@
-import torch
 import torch.nn as nn
+
+from torch import Tensor
 
 
 class ResidualConnection(nn.Module):
@@ -32,7 +33,7 @@ class ResidualConnection(nn.Module):
         else:
             self.downsample_layer = None
 
-    def forward(self, X: torch.Tensor, output: torch.Tensor) -> torch.Tensor:
+    def forward(self, X: Tensor, output: Tensor) -> Tensor:
         """
         The goal of this method is
         to add the input and output
@@ -40,12 +41,12 @@ class ResidualConnection(nn.Module):
         connexion
 
         Arguments:
-            -X: torch.Tensor: The tensor
+            -X: Tensor: The tensor
             to be added
-            -output: torch.Tensor: The
+            -output: Tensor: The
             output of the layer
         Returns:
-            -residual_tensor: torch.Tensor:
+            -residual_tensor: Tensor:
             The new Tensor after addition
         """
 
