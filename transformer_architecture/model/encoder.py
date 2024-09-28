@@ -2,6 +2,10 @@ from torch import Tensor
 from typing import Callable, Optional
 
 from transformer_architecture.model.attention import MultiHeadAttention
+from transformer_architecture.utils.normalization import NormalizationLayer
+from transformer_architecture.utils.residual_connexion import (
+    ResidualConnection,
+)
 from transformer_architecture.utils.activation import relu
 
 
@@ -92,5 +96,18 @@ class TransformerEncoderLayer(MultiHeadAttention):
         super()._create_attention_matrices(src)
         Q, K, V = super().split_heads()
         attention_output = super().forward(key=K, query=Q, value=V)
+
+        residual_connexion = ResidualConnection(
+            in_dimensions=self.d_model,
+            out_dimensions=self.num_heads * self.d_v,
+        )
+        attention_output = residual_connexion.forward(
+            X=src, output=attention_output
+        )
+
+        input_shape = list(attention_output.size())
+        normalisation = NormalizationLayer(normalized_shape=input_shape)
+
+        attention_output = normalisation.forward(attention_output)
 
         return attention_output
