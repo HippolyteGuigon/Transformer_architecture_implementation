@@ -1,6 +1,6 @@
 import torch
 
-from typing import List
+from torch import Tensor
 
 
 class NormalizationLayer:
@@ -11,7 +11,7 @@ class NormalizationLayer:
     Architecture
 
     Arguments:
-        -normalized_shape: List[int]: The
+        -normalized_shape: int: The
         shape of the element to be normalized
         -eps: Value added to the denominator
         for numerical stability
@@ -27,20 +27,51 @@ class NormalizationLayer:
 
     def __init__(
         self,
-        normalized_shape: List[int],
+        normalized_shape: int,
         eps: float = 1e-05,
         elementwise_affine: bool = True,
         bias: bool = True,
     ) -> None:
         self.eps = eps
 
-        if elementwise_affine:
-            elementwise_affine_dim = normalized_shape[-1]
-            self.gamma = torch.randn(
+        self.elementwise_affine = elementwise_affine
+        self.bias = bias
+
+        if self.elementwise_affine:
+            elementwise_affine_dim = normalized_shape
+            self.gamma = torch.ones(
                 (elementwise_affine_dim), requires_grad=True
             )
 
-            if bias:
-                self.beta = torch.randn(
+            if self.bias:
+                self.beta = torch.zeros(
                     (elementwise_affine_dim), requires_grad=True
                 )
+
+    def forward(self, input: Tensor) -> Tensor:
+        """
+        The goal of this method is to implement the
+        normalization layer process to an input
+        tensor
+
+        Arguments:
+            -input: Tensor: The input Tensor to
+            be normalized
+        Returns:
+            -normalized_layer: Tensor: The input
+            after it was normalized
+        """
+
+        mean = torch.mean(input, dim=-1, keepdim=True)
+        standard_deviation = torch.std(
+            input, dim=-1, keepdim=True, unbiased=False
+        )
+
+        normalized_input = (input - mean) / (standard_deviation + self.eps)
+
+        if self.elementwise_affine:
+            normalized_input *= self.gamma
+            if self.bias:
+                normalized_input += self.beta
+
+        return normalized_input

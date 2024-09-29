@@ -8,8 +8,9 @@ from nltk.corpus import webtext
 from transformer_architecture.preprocessing.embedding import (
     DataPreprocessor,
     Embedding,
+    SinusoidalPositionalEncoding,
 )
-from transformer_architecture.utils.activation import softmax
+from transformer_architecture.utils.activation import softmax, relu
 from transformer_architecture.model.attention import MultiHeadAttention
 
 nltk.download("punkt_tab")
@@ -45,9 +46,14 @@ class Test(unittest.TestCase):
 
         preprocessor = DataPreprocessor(sentences)
         embedder = Embedding(embedding_dim=embedding_dim)
+        positionnal_encoding = SinusoidalPositionalEncoding(
+            max_len=longest_sentence_word, embedding_dim=embedding_dim
+        )
+        positionnal_encoding._init_positional_encoding()
 
         sentence_indices = preprocessor.get_indices()
         embeddings = embedder.embed(sentence_indices)
+        embeddings = positionnal_encoding.add_positional_encoding(embeddings)
 
         embedded_dim = embeddings.size()
 
@@ -80,14 +86,18 @@ class Test(unittest.TestCase):
 
         test_size = 10000
 
-        test_neuron = torch.rand(size=(test_size, 10))
+        test_neuron = torch.randint(low=-50, high=50, size=(test_size, 10))
         valid_output = torch.ones(size=(test_size,))
 
         softmax_results = torch.sum(softmax(x=test_neuron, axis=1), dim=1)
+        relu_results = relu(test_neuron)
+
+        min_relu_results = torch.min(relu_results)
 
         is_valid = torch.allclose(softmax_results, valid_output)
 
         self.assertTrue(is_valid)
+        self.assertGreaterEqual(min_relu_results, 0)
 
     def test_self_attention_mechanism(self) -> None:
         """
@@ -124,10 +134,15 @@ class Test(unittest.TestCase):
         longest_sentence_word = max(len(s.split()) for s in sentences)
 
         preprocessor = DataPreprocessor(sentences)
+        positionnal_encoding = SinusoidalPositionalEncoding(
+            max_len=longest_sentence_word, embedding_dim=embedding_dim
+        )
+        positionnal_encoding._init_positional_encoding()
 
         sentence_indices = preprocessor.get_indices()
         embeddings = embedder.embed(sentence_indices)
 
+        embeddings = positionnal_encoding.add_positional_encoding(embeddings)
         multi_head_attention._create_attention_matrices(embeddings)
 
         Q, K, V = multi_head_attention.split_heads()
