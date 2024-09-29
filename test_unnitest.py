@@ -8,6 +8,7 @@ from nltk.corpus import webtext
 from transformer_architecture.preprocessing.embedding import (
     DataPreprocessor,
     Embedding,
+    SinusoidalPositionalEncoding,
 )
 from transformer_architecture.utils.activation import softmax, relu
 from transformer_architecture.model.attention import MultiHeadAttention
@@ -45,9 +46,14 @@ class Test(unittest.TestCase):
 
         preprocessor = DataPreprocessor(sentences)
         embedder = Embedding(embedding_dim=embedding_dim)
+        positionnal_encoding = SinusoidalPositionalEncoding(
+            max_len=longest_sentence_word, embedding_dim=embedding_dim
+        )
+        positionnal_encoding._init_positional_encoding()
 
         sentence_indices = preprocessor.get_indices()
         embeddings = embedder.embed(sentence_indices)
+        embeddings = positionnal_encoding.add_positional_encoding(embeddings)
 
         embedded_dim = embeddings.size()
 
@@ -128,10 +134,15 @@ class Test(unittest.TestCase):
         longest_sentence_word = max(len(s.split()) for s in sentences)
 
         preprocessor = DataPreprocessor(sentences)
+        positionnal_encoding = SinusoidalPositionalEncoding(
+            max_len=longest_sentence_word, embedding_dim=embedding_dim
+        )
+        positionnal_encoding._init_positional_encoding()
 
         sentence_indices = preprocessor.get_indices()
         embeddings = embedder.embed(sentence_indices)
 
+        embeddings = positionnal_encoding.add_positional_encoding(embeddings)
         multi_head_attention._create_attention_matrices(embeddings)
 
         Q, K, V = multi_head_attention.split_heads()
