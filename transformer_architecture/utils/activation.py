@@ -11,14 +11,14 @@ def relu(x: Tensor, axis: Optional[int] = None) -> Tensor:
     for neuron activation
 
     Arguments:
-        -x: torch.tensor: The neuron
+        -x: Tensor: The neuron
         to be activated
         -axis: Optional[int]: The axis
         along which the max operation
         should be applied
     Returns:
-        -relu_result: torch.tensor:
-        The neuron output once activated
+        -relu_result: Tensor: The neuron
+        output once activated
     """
 
     relu_result = torch.clamp(x, min=0)
@@ -33,13 +33,13 @@ def softmax(x: Tensor, axis: Optional[int] = None) -> Tensor:
     for neuron activation
 
     Arguments:
-        -x: torch.tensor: The neuron
+        -x: Tensor: The neuron
         to be activated
         -axis: Optional[int]: The axis
         along which the max operation
         should be applied
     Returns:
-        -softmax_result: torch.tensor:
+        -softmax_result: Tensor:
         The neuron output once activated
     """
 
