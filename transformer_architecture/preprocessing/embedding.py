@@ -70,7 +70,7 @@ class DataPreprocessor:
             * (self.max_len - len(sentence.split()))
             for sentence in self.sentences
         ]
-        sentences_indices = Tensor(indices, dtype=torch.long)
+        sentences_indices = torch.tensor(indices, dtype=torch.long)
 
         return sentences_indices
 
