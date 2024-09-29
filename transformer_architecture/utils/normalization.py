@@ -1,6 +1,6 @@
 import torch
 
-from typing import List
+from torch import Tensor
 
 
 class NormalizationLayer:
@@ -11,7 +11,7 @@ class NormalizationLayer:
     Architecture
 
     Arguments:
-        -normalized_shape: List[int]: The
+        -normalized_shape: int: The
         shape of the element to be normalized
         -eps: Value added to the denominator
         for numerical stability
@@ -27,7 +27,7 @@ class NormalizationLayer:
 
     def __init__(
         self,
-        normalized_shape: List[int],
+        normalized_shape: int,
         eps: float = 1e-05,
         elementwise_affine: bool = True,
         bias: bool = True,
@@ -38,7 +38,7 @@ class NormalizationLayer:
         self.bias = bias
 
         if self.elementwise_affine:
-            elementwise_affine_dim = normalized_shape[-1]
+            elementwise_affine_dim = normalized_shape
             self.gamma = torch.ones(
                 (elementwise_affine_dim), requires_grad=True
             )
@@ -48,17 +48,17 @@ class NormalizationLayer:
                     (elementwise_affine_dim), requires_grad=True
                 )
 
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
+    def forward(self, input: Tensor) -> Tensor:
         """
         The goal of this method is to implement the
         normalization layer process to an input
         tensor
 
         Arguments:
-            -input: torch.Tensor: The input Tensor to
+            -input: Tensor: The input Tensor to
             be normalized
         Returns:
-            -normalized_layer: torch.Tensor: The input
+            -normalized_layer: Tensor: The input
             after it was normalized
         """
 
