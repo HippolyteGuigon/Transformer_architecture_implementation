@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 
+from torch import Tensor
 from typing import Tuple
 from abc import ABC, abstractmethod
 from transformer_architecture.utils.activation import softmax
@@ -27,21 +28,21 @@ class Attention(ABC, nn.Module):
     @abstractmethod
     def forward(
         self,
-        embeddings: torch.Tensor,
+        embeddings: Tensor,
         masking: bool = False,
-    ) -> torch.Tensor:
+    ) -> Tensor:
         """
         The goal of this method is to calculate
         the self-attention scores for a given
         input
 
         Arguments:
-            -embeddings: torch.Tensor: The embedding
+            -embeddings: Tensor: The embedding
             input
             -masking: bool: Wether the attention matrix
             is masked
         Returns:
-            -attention_score: torch.Tensor: The results
+            -attention_score: Tensor: The results
             for the attention values
         """
 
@@ -65,27 +66,27 @@ class SelfAttention(Attention):
 
     def forward(
         self,
-        key: torch.Tensor,
-        query: torch.Tensor,
-        value: torch.Tensor,
+        key: Tensor,
+        query: Tensor,
+        value: Tensor,
         masking: bool = False,
-    ) -> torch.Tensor:
+    ) -> Tensor:
         """
         The goal of this method is to calculate
         the self-attention scores for a given
         embedding input
 
         Arguments:
-            -key: torch.Tensor: The key matrix of the
+            -key: Tensor: The key matrix of the
             attention head
-            -query: torch.Tensor: The query matix of the
+            -query: Tensor: The query matix of the
             attention head
-            -value: torch.Tensor: The value matrix of the
+            -value: Tensor: The value matrix of the
             attention head
             -masking: bool: Wether the attention matrix
             is masked
         Returns:
-            -attention_score: torch.Tensor: The attention
+            -attention_score: Tensor: The attention
             score output
         """
 
@@ -145,7 +146,7 @@ class MultiHeadAttention(SelfAttention):
         ), "The number of heads must be divisible\
             by the dimension of the embedding"
 
-    def _create_attention_matrices(self, embeddings: torch.Tensor) -> None:
+    def _create_attention_matrices(self, embeddings: Tensor) -> None:
         """
         The goal of this method is to create
         the key, query and value matrices
@@ -154,7 +155,7 @@ class MultiHeadAttention(SelfAttention):
         space
 
         Arguments:
-            -embeddings: torch.Tensor: The
+            -embeddings: Tensor: The
             input embeddings
         Returns
             None
@@ -164,7 +165,7 @@ class MultiHeadAttention(SelfAttention):
         self.key = self.key_layer(embeddings)
         self.value = self.value_layer(embeddings)
 
-    def split_heads(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def split_heads(self) -> Tuple[Tensor, Tensor, Tensor]:
         """
         The goal of this method is to
         split the key, query, value
@@ -174,9 +175,9 @@ class MultiHeadAttention(SelfAttention):
         Arguments:
             -None
         Returns:
-            -Q_heads: torch.Tensor: Splitted
+            -Q_heads: Tensor: Splitted
             query attention head
-            -K_heads: torch.Tensor: Splitted
+            -K_heads: Tensor: Splitted
             key attention head
             -V_heads: Splitted value attention
             head
@@ -194,7 +195,7 @@ class MultiHeadAttention(SelfAttention):
 
         return Q_heads, K_heads, V_heads
 
-    def forward(self, key, query, value) -> torch.Tensor:
+    def forward(self, key, query, value) -> Tensor:
         """
         The goal of this function is to
         compute the self-attention score
@@ -202,16 +203,16 @@ class MultiHeadAttention(SelfAttention):
         concatenating the result
 
         Arguments:
-            -key: torch.Tensor: The key
+            -key: Tensor: The key
             matrices of the attention
             heads
-            -query: torch.Tensor: The
+            -query: Tensor: The
             query matrices of the attention
             heads
-            -value: torch.Tensor: The value
+            -value: Tensor: The value
             matrices of the attention heads
         Returns:
-            -attention_scores: torch.Tensor:
+            -attention_scores: Tensor:
             The concatenated results of the
             attention score for each attention
             head
