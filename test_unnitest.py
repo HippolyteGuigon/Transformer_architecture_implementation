@@ -10,7 +10,7 @@ from transformer_architecture.preprocessing.embedding import (
     Embedding,
     SinusoidalPositionalEncoding,
 )
-from transformer_architecture.utils.activation import softmax, relu
+from transformer_architecture.utils.activation import softmax, relu, sigmoid
 from transformer_architecture.model.attention import MultiHeadAttention
 
 nltk.download("punkt_tab")
@@ -91,12 +91,14 @@ class Test(unittest.TestCase):
 
         softmax_results = torch.sum(softmax(x=test_neuron, axis=1), dim=1)
         relu_results = relu(test_neuron)
+        sigmoid_result = sigmoid(test_neuron)
 
         min_relu_results = torch.min(relu_results)
+        is_valid_sigmoid = torch.allclose(softmax_results, valid_output)
+        is_valid_sigmoid = torch.all(sigmoid_result <= 1)
 
-        is_valid = torch.allclose(softmax_results, valid_output)
-
-        self.assertTrue(is_valid)
+        self.assertTrue(is_valid_sigmoid)
+        self.assertTrue(is_valid_sigmoid)
         self.assertGreaterEqual(min_relu_results, 0)
 
     def test_self_attention_mechanism(self) -> None:
