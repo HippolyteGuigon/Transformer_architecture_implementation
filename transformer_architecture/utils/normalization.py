@@ -1,7 +1,6 @@
 import torch
 
 from torch import Tensor
-from typing import List
 
 
 class NormalizationLayer:
@@ -12,7 +11,7 @@ class NormalizationLayer:
     Architecture
 
     Arguments:
-        -normalized_shape: List[int]: The
+        -normalized_shape: int: The
         shape of the element to be normalized
         -eps: Value added to the denominator
         for numerical stability
@@ -28,7 +27,7 @@ class NormalizationLayer:
 
     def __init__(
         self,
-        normalized_shape: List[int],
+        normalized_shape: int,
         eps: float = 1e-05,
         elementwise_affine: bool = True,
         bias: bool = True,
@@ -39,7 +38,7 @@ class NormalizationLayer:
         self.bias = bias
 
         if self.elementwise_affine:
-            elementwise_affine_dim = normalized_shape[-1]
+            elementwise_affine_dim = normalized_shape
             self.gamma = torch.ones(
                 (elementwise_affine_dim), requires_grad=True
             )
