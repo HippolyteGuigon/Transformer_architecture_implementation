@@ -132,6 +132,11 @@ class MultiHeadAttention(SelfAttention):
         self, embedding_dim: int, num_heads: int, d_k: int, d_v: int
     ) -> None:
         super().__init__()
+
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
+
         self.query_layer = nn.Linear(embedding_dim, d_k * num_heads)
         self.key_layer = nn.Linear(embedding_dim, d_k * num_heads)
         self.value_layer = nn.Linear(embedding_dim, d_v * num_heads)
@@ -161,9 +166,9 @@ class MultiHeadAttention(SelfAttention):
             None
         """
 
-        self.query = self.query_layer(embeddings)
-        self.key = self.key_layer(embeddings)
-        self.value = self.value_layer(embeddings)
+        self.query = self.query_layer(embeddings).to(self.device)
+        self.key = self.key_layer(embeddings).to(self.device)
+        self.value = self.value_layer(embeddings).to(self.device)
 
     def split_heads(self) -> Tuple[Tensor, Tensor, Tensor]:
         """
