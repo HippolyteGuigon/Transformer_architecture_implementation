@@ -70,6 +70,11 @@ class TransformerEncoderLayer(MultiHeadAttention):
             d_v=self.d_v,
         )
 
+        self.residual_connexion = ResidualConnection(
+            in_dimensions=self.d_model,
+            out_dimensions=self.num_heads * self.d_v,
+        )
+
     def forward(
         self,
         src: Tensor,
@@ -97,21 +102,16 @@ class TransformerEncoderLayer(MultiHeadAttention):
         Q, K, V = super().split_heads()
         attention_output = super().forward(key=K, query=Q, value=V)
 
-        residual_connexion = ResidualConnection(
-            in_dimensions=self.d_model,
-            out_dimensions=self.num_heads * self.d_v,
-        )
-
         input_shape = list(attention_output.size())
         normalisation = NormalizationLayer(normalized_shape=input_shape)
 
         if self.norm_first:
             attention_output = normalisation.forward(attention_output)
-            attention_output = residual_connexion.forward(
+            attention_output = self.residual_connexion.forward(
                 X=src, output=attention_output
             )
         else:
-            attention_output = residual_connexion.forward(
+            attention_output = self.residual_connexion.forward(
                 X=src, output=attention_output
             )
             attention_output = normalisation.forward(attention_output)
