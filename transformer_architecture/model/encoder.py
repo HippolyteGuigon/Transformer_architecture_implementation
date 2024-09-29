@@ -76,9 +76,14 @@ class TransformerEncoderLayer(MultiHeadAttention):
         self.dropout = nn.Dropout(p=dropout)
         self.linear2 = nn.Linear(self.dim_feedforward, self.d_model)
 
-        self.residual_connexion = ResidualConnection(
-            in_dimensions=self.d_model,
-            out_dimensions=self.num_heads * self.d_v,
+        self.norm1 = NormalizationLayer(normalized_shape=d_model)
+        self.norm2 = NormalizationLayer(normalized_shape=d_model)
+
+        self.residual1 = ResidualConnection(
+            in_dimensions=d_model, out_dimensions=self.num_heads * self.d_v
+        )
+        self.residual2 = ResidualConnection(
+            in_dimensions=d_model, out_dimensions=self.num_heads * self.d_v
         )
 
     def forward(
@@ -108,19 +113,16 @@ class TransformerEncoderLayer(MultiHeadAttention):
         Q, K, V = super().split_heads()
         attention_output = super().forward(key=K, query=Q, value=V)
 
-        input_shape = list(attention_output.size())
-        normalisation = NormalizationLayer(normalized_shape=input_shape)
-
         if self.norm_first:
-            attention_output = normalisation.forward(attention_output)
-            attention_output = self.residual_connexion.forward(
+            attention_output = self.norm1.forward(attention_output)
+            attention_output = self.residual1.forward(
                 X=src, output=attention_output
             )
         else:
-            attention_output = self.residual_connexion.forward(
+            attention_output = self.residual1.forward(
                 X=src, output=attention_output
             )
-            attention_output = normalisation.forward(attention_output)
+            attention_output = self.norm1.forward(attention_output)
 
         attention_output = self.linear1(attention_output)
         attention_output = self.dropout(attention_output)
@@ -129,14 +131,14 @@ class TransformerEncoderLayer(MultiHeadAttention):
         attention_output = self.linear2(attention_output)
 
         if self.norm_first:
-            attention_output = normalisation.forward(attention_output)
-            attention_output = self.residual_connexion.forward(
+            attention_output = self.norm2.forward(attention_output)
+            attention_output = self.residual2.forward(
                 X=src, output=attention_output
             )
         else:
-            attention_output = self.residual_connexion.forward(
+            attention_output = self.residual2.forward(
                 X=src, output=attention_output
             )
-            attention_output = normalisation.forward(attention_output)
+            attention_output = self.norm2.forward(attention_output)
 
         return attention_output
