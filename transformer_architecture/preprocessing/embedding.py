@@ -4,6 +4,7 @@ import torch.nn as nn
 
 import warnings
 
+from torch import Tensor
 from abc import ABC, abstractmethod
 from typing import List, Dict
 
@@ -49,7 +50,7 @@ class DataPreprocessor:
 
         return word_to_index
 
-    def get_indices(self) -> torch.tensor:
+    def get_indices(self) -> Tensor:
         """
         The goal of this method is to
         get all corresponding indices
@@ -58,7 +59,7 @@ class DataPreprocessor:
         Arguments:
             -None
         Returns:
-            -sentences_indices: torch.tensor: The
+            -sentences_indices: Tensor: The
             indices of the different words
             composing the input sentences
         """
@@ -69,7 +70,7 @@ class DataPreprocessor:
             * (self.max_len - len(sentence.split()))
             for sentence in self.sentences
         ]
-        sentences_indices = torch.tensor(indices, dtype=torch.long)
+        sentences_indices = Tensor(indices, dtype=torch.long)
 
         return sentences_indices
 
@@ -97,17 +98,17 @@ class Embedding(nn.Module):
             num_embeddings=num_embeddings, embedding_dim=embedding_dim
         )
 
-    def embed(self, sentences_indices: torch.tensor) -> torch.tensor:
+    def embed(self, sentences_indices: Tensor) -> Tensor:
         """
         The goal of this method is to
         embed sequences once word index
         has been created
 
         Arguments:
-            -sentences_indices: torch.tensor: The
+            -sentences_indices: Tensor: The
             sentence indices which are to be embedded
         Returns:
-            -embedded: torch.tensor: The
+            -embedded: Tensor: The
             embedding tensor
         """
 
@@ -137,7 +138,7 @@ class PositionalEncoding(ABC):
         self.pe = self._init_positional_encoding()
 
     @abstractmethod
-    def _init_positional_encoding(self) -> torch.tensor:
+    def _init_positional_encoding(self) -> Tensor:
         """
         The goal of this class is to
         compute the positional encoding
@@ -147,25 +148,25 @@ class PositionalEncoding(ABC):
         Arguments:
             -None
         Returns:
-            -pe: torch.tensor: The positional
+            -pe: Tensor: The positional
             encoding of the tensor
         """
 
         pass
 
     @abstractmethod
-    def add_positional_encoding(self, data: torch.tensor) -> torch.tensor:
+    def add_positional_encoding(self, data: Tensor) -> Tensor:
         """
         The goal of this abstract method is to
         add positional encoding to the input
         sequence
 
         Arguments:
-            -data: torch.tensor: The input data
+            -data: Tensor: The input data
             to which positional encoding will
             be added
         Returns:
-            -encoded_data: torch.tensor: The data once
+            -encoded_data: Tensor: The data once
             transformed with positional encoding
         """
 
@@ -190,7 +191,7 @@ class SinusoidalPositionalEncoding(PositionalEncoding):
         self.max_len = max_len
         self.embedding_dim = embedding_dim
 
-    def _init_positional_encoding(self) -> torch.tensor:
+    def _init_positional_encoding(self) -> Tensor:
         """
         The goal of this method is to compute
         the sinusoidal positional encoding and
@@ -199,7 +200,7 @@ class SinusoidalPositionalEncoding(PositionalEncoding):
         Arguments:
             -None
         Returns:
-            -pe: torch.tensor: The positional
+            -pe: Tensor: The positional
             encoding tensor
         """
 
@@ -216,18 +217,18 @@ class SinusoidalPositionalEncoding(PositionalEncoding):
 
         return pe
 
-    def add_positional_encoding(self, data: torch.tensor) -> torch.tensor:
+    def add_positional_encoding(self, data: Tensor) -> Tensor:
         """
         The goal of this abstract method is to
         add positional encoding to the input
         sequence
 
         Arguments:
-            -data: torch.tensor: The input data
+            -data: Tensor: The input data
             to which positional encoding will
             be added
         Returns:
-            -encoded_data: torch.tensor: The data once
+            -encoded_data: Tensor: The data once
             transformed with positional encoding
         """
 
