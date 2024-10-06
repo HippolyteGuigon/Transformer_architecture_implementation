@@ -200,7 +200,7 @@ class MultiHeadAttention(SelfAttention):
 
         return Q_heads, K_heads, V_heads
 
-    def forward(self, key, query, value) -> Tensor:
+    def forward(self, key, query, value, masking: bool = False) -> Tensor:
         """
         The goal of this function is to
         compute the self-attention score
@@ -216,6 +216,8 @@ class MultiHeadAttention(SelfAttention):
             heads
             -value: Tensor: The value
             matrices of the attention heads
+            -masking: bool: Wether the attention matrix
+            is masked
         Returns:
             -attention_scores: Tensor:
             The concatenated results of the
@@ -223,7 +225,7 @@ class MultiHeadAttention(SelfAttention):
             head
         """
 
-        attention_scores = super().forward(key, query, value)
+        attention_scores = super().forward(key, query, value, masking=masking)
 
         batch_size, _, seq_len, _ = attention_scores.size()
 
