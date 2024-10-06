@@ -1,8 +1,14 @@
+import torch.nn as nn
+
 from torch import Tensor
 from typing import Callable, Optional
 
 from transformer_architecture.model.attention import MultiHeadAttention
 from transformer_architecture.utils.activation import relu
+from transformer_architecture.utils.normalization import NormalizationLayer
+from transformer_architecture.utils.residual_connexion import (
+    ResidualConnection,
+)
 
 
 class TransformerDecoderLayer(MultiHeadAttention):
@@ -66,14 +72,28 @@ class TransformerDecoderLayer(MultiHeadAttention):
             d_v=self.d_v,
         )
 
+        self.linear1 = nn.Linear(self.d_model, self.dim_feedforward)
+        self.dropout = nn.Dropout(p=dropout)
+        self.linear2 = nn.Linear(self.dim_feedforward, self.d_model)
+
+        self.norm1 = NormalizationLayer(normalized_shape=d_model)
+        self.norm2 = NormalizationLayer(normalized_shape=d_model)
+
+        self.residual1 = ResidualConnection(
+            in_dimensions=d_model, out_dimensions=self.num_heads * self.d_v
+        )
+        self.residual2 = ResidualConnection(
+            in_dimensions=d_model, out_dimensions=self.num_heads * self.d_v
+        )
+
     def forward(
         self,
         tgt: Tensor,
         memory: Tensor,
-        tgt_mask: Optional[Tensor],
-        memory_mask: Optional[Tensor],
-        tgt_key_padding_mask: Optional[Tensor],
-        memory_key_padding_mask: Optional[Tensor],
+        tgt_mask: Optional[Tensor] = None,
+        memory_mask: Optional[Tensor] = None,
+        tgt_key_padding_mask: Optional[Tensor] = None,
+        memory_key_padding_mask: Optional[Tensor] = None,
         tgt_is_casual: bool = False,
         memory_is_casual: bool = False,
     ) -> Tensor:
@@ -99,3 +119,22 @@ class TransformerDecoderLayer(MultiHeadAttention):
             -memory_is_causal: bool: If specified, applies a causal
             mask as memory mask
         """
+
+        super()._create_attention_matrices(tgt)
+        Q, K, V = super().split_heads()
+        attention_output = super().forward(
+            key=K, query=Q, value=V, masking=True
+        )
+
+        if self.norm_first:
+            attention_output = self.norm1.forward(attention_output)
+            attention_output = self.residual1.forward(
+                X=tgt, output=attention_output
+            )
+        else:
+            attention_output = self.residual1.forward(
+                X=tgt, output=attention_output
+            )
+            attention_output = self.norm1.forward(attention_output)
+
+        return attention_output
