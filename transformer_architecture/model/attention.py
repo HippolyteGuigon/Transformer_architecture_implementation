@@ -200,7 +200,7 @@ class MultiHeadAttention(SelfAttention):
 
         return Q_heads, K_heads, V_heads
 
-    def forward(self, key, query, value) -> Tensor:
+    def forward(self, key, query, value, masking: bool = False) -> Tensor:
         """
         The goal of this function is to
         compute the self-attention score
@@ -216,6 +216,8 @@ class MultiHeadAttention(SelfAttention):
             heads
             -value: Tensor: The value
             matrices of the attention heads
+            -masking: bool: Wether the attention matrix
+            is masked
         Returns:
             -attention_scores: Tensor:
             The concatenated results of the
@@ -223,7 +225,7 @@ class MultiHeadAttention(SelfAttention):
             head
         """
 
-        attention_scores = super().forward(key, query, value)
+        attention_scores = super().forward(key, query, value, masking=masking)
 
         batch_size, _, seq_len, _ = attention_scores.size()
 
@@ -232,3 +234,34 @@ class MultiHeadAttention(SelfAttention):
         )
 
         return attention_scores
+
+    def _cross_attention(
+        self, query: Tensor, key: Tensor, value: Tensor, masking: bool = False
+    ) -> Tensor:
+        """
+        The goal of this function is to compute
+        cross-attention scores where the query
+        comes from the decoder and the key/value
+        from the encoder.
+
+        Arguments:
+            - query: Tensor: The query matrix from the decoder
+            - key: Tensor: The key matrix from the encoder
+            - value: Tensor: The value matrix from the encoder
+            - masking: bool: Whether the attention matrix is masked
+
+        Returns:
+            - cross_attention_scores: Tensor: The cross-attention scores
+        """
+
+        cross_attention_scores = super().forward(
+            key, query, value, masking=masking
+        )
+
+        batch_size, seq_len, _ = cross_attention_scores.size()
+
+        cross_attention_scores = cross_attention_scores.view(
+            batch_size, seq_len, self.num_heads * self.d_v
+        )
+
+        return cross_attention_scores
