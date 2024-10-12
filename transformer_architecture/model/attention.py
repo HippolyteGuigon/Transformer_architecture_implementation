@@ -235,23 +235,7 @@ class MultiHeadAttention(SelfAttention):
 
         return attention_scores
 
-
-class CrossAttention(SelfAttention):
-    """
-    The goal of this class is to implement
-    the cross-attention mechanism taking place
-    between the encoder and the decoder
-
-    Arguments:
-        -None
-    Returns:
-        -None
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(
+    def _cross_attention(
         self, query: Tensor, key: Tensor, value: Tensor, masking: bool = False
     ) -> Tensor:
         """
@@ -267,22 +251,17 @@ class CrossAttention(SelfAttention):
             - masking: bool: Whether the attention matrix is masked
 
         Returns:
-            - attention_scores: Tensor: The cross-attention scores
+            - cross_attention_scores: Tensor: The cross-attention scores
         """
 
-        dot_product = torch.matmul(query, key.transpose(-2, -1))
-        scaled_dot_product = dot_product / math.sqrt(self.d_k)
+        cross_attention_scores = super().forward(
+            key, query, value, masking=masking
+        )
 
-        if masking:
-            mask_size = key.size(-2)
-            mask = torch.triu(
-                torch.ones(mask_size, mask_size, device=key.device), diagonal=1
-            )
-            scaled_dot_product = scaled_dot_product.masked_fill(
-                mask == 1, float("-inf")
-            )
+        batch_size, seq_len, _ = cross_attention_scores.size()
 
-        attention_scores = softmax(scaled_dot_product, axis=-1)
-        attention_scores = torch.matmul(attention_scores, value)
+        cross_attention_scores = cross_attention_scores.view(
+            batch_size, seq_len, self.num_heads * self.d_v
+        )
 
-        return attention_scores
+        return cross_attention_scores
