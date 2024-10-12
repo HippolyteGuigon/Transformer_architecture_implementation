@@ -116,10 +116,10 @@ class Test(unittest.TestCase):
             -None
         """
 
-        embedding_dim = 64
-        key_dimension = 32
-        value_dimension = 16
-        num_heads = 8
+        embedding_dim = 16
+        key_dimension = 8
+        value_dimension = 4
+        num_heads = 2
 
         embedder = Embedding(embedding_dim=embedding_dim)
 
@@ -189,8 +189,8 @@ class Test(unittest.TestCase):
             -None
         """
 
-        embedding_dim = 64
-        num_heads = 8
+        embedding_dim = 16
+        num_heads = 2
 
         embedder = Embedding(embedding_dim=embedding_dim)
 
@@ -251,8 +251,8 @@ class Test(unittest.TestCase):
             -None
         """
 
-        embedding_dim = 32
-        num_heads = 4
+        embedding_dim = 16
+        num_heads = 2
 
         embedder = Embedding(embedding_dim=embedding_dim)
 
