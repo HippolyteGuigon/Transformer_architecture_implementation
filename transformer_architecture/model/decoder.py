@@ -78,11 +78,15 @@ class TransformerDecoderLayer(MultiHeadAttention):
 
         self.norm1 = NormalizationLayer(normalized_shape=d_model)
         self.norm2 = NormalizationLayer(normalized_shape=d_model)
+        self.norm3 = NormalizationLayer(normalized_shape=d_model)
 
         self.residual1 = ResidualConnection(
             in_dimensions=d_model, out_dimensions=self.num_heads * self.d_v
         )
         self.residual2 = ResidualConnection(
+            in_dimensions=d_model, out_dimensions=self.num_heads * self.d_v
+        )
+        self.residual3 = ResidualConnection(
             in_dimensions=d_model, out_dimensions=self.num_heads * self.d_v
         )
 
@@ -155,5 +159,9 @@ class TransformerDecoderLayer(MultiHeadAttention):
                 X=tgt, output=cross_attention_output
             )
             cross_attention_output = self.norm2.forward(cross_attention_output)
+
+        cross_attention_output = self.linear1(cross_attention_output)
+        cross_attention_output = self.dropout(cross_attention_output)
+        cross_attention_output = self.linear2(cross_attention_output)
 
         return cross_attention_output
