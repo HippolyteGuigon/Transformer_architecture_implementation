@@ -13,6 +13,7 @@ from transformer_architecture.preprocessing.embedding import (
 from transformer_architecture.utils.activation import softmax, relu, sigmoid
 from transformer_architecture.model.attention import MultiHeadAttention
 from transformer_architecture.model.encoder import TransformerEncoderLayer
+from transformer_architecture.model.decoder import TransformerDecoderLayer
 
 nltk.download("punkt_tab")
 nltk.download("webtext")
@@ -234,6 +235,75 @@ class Test(unittest.TestCase):
             embedding_dim,
             output_size[2],
             "Encoder value output mismatches the\
+                number of heads and value dimension\
+                    required",
+        )
+
+    def test_encoder_decoder(self) -> None:
+        """
+        The goal of this test is to check
+        if encoder-decoder work well when used
+        together to produce a coherent output
+
+        Arguments:
+            -None
+        Returns:
+            -None
+        """
+
+        embedding_dim = 32
+        num_heads = 4
+
+        embedder = Embedding(embedding_dim=embedding_dim)
+
+        text = webtext.raw("pirates.txt")
+
+        sentences = sent_tokenize(text)
+
+        number_sentences = len(sentences)
+        longest_sentence_word = max(len(s.split()) for s in sentences)
+
+        preprocessor = DataPreprocessor(sentences)
+
+        sentence_indices = preprocessor.get_indices()
+        embeddings = embedder.embed(sentence_indices)
+
+        positionnal_encoding = SinusoidalPositionalEncoding(
+            max_len=longest_sentence_word, embedding_dim=embedding_dim
+        )
+        positionnal_encoding._init_positional_encoding()
+        embeddings = positionnal_encoding.add_positional_encoding(embeddings)
+
+        encoder = TransformerEncoderLayer(
+            d_model=embedding_dim, num_heads=num_heads, norm_first=True
+        )
+
+        decoder = TransformerDecoderLayer(
+            d_model=embedding_dim, num_heads=num_heads, norm_first=True
+        )
+
+        encoder_output = encoder.forward(src=embeddings)
+
+        decoder_output = decoder.forward(tgt=embeddings, memory=encoder_output)
+
+        output_size = decoder_output.size()
+
+        self.assertEqual(
+            number_sentences,
+            output_size[0],
+            "Decoder value output mismatches the\
+                number of sentences in its final dimensions",
+        )
+        self.assertEqual(
+            longest_sentence_word,
+            output_size[1],
+            "Decoder value output mismatches the\
+                longest sentence word in its final dimensions",
+        )
+        self.assertEqual(
+            embedding_dim,
+            output_size[2],
+            "Decoder value output mismatches the\
                 number of heads and value dimension\
                     required",
         )
