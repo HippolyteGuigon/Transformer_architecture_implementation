@@ -137,4 +137,8 @@ class TransformerDecoderLayer(MultiHeadAttention):
             )
             attention_output = self.norm1.forward(attention_output)
 
-        return attention_output
+        cross_attention_output = super()._cross_attention(
+            query=tgt, key=memory, value=memory
+        )
+
+        return cross_attention_output
