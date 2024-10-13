@@ -3,6 +3,8 @@
 *.txt
 *.ipynb
 .vscode/
+.data/
+myenv/
 
 #Except these files
 
