@@ -145,10 +145,6 @@ class TransformerDecoderLayer(MultiHeadAttention):
             query=tgt, key=memory, value=memory
         )
 
-        cross_attention_output = super()._cross_attention(
-            query=tgt, key=memory, value=memory
-        )
-
         if self.norm_first:
             cross_attention_output = self.norm2.forward(attention_output)
             cross_attention_output = self.residual2.forward(
