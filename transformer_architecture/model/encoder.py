@@ -114,7 +114,7 @@ class TransformerEncoderLayer(MultiHeadAttention):
         attention_output = super().forward(key=K, query=Q, value=V)
 
         if self.norm_first:
-            attention_output = self.norm1.forward(attention_output)
+            # attention_output = self.norm1.forward(attention_output)
             attention_output = self.residual1.forward(
                 X=src, output=attention_output
             )
@@ -122,7 +122,7 @@ class TransformerEncoderLayer(MultiHeadAttention):
             attention_output = self.residual1.forward(
                 X=src, output=attention_output
             )
-            attention_output = self.norm1.forward(attention_output)
+            # attention_output = self.norm1.forward(attention_output)
 
         attention_output = self.linear1(attention_output)
         attention_output = self.dropout(attention_output)
@@ -131,7 +131,7 @@ class TransformerEncoderLayer(MultiHeadAttention):
         attention_output = self.linear2(attention_output)
 
         if self.norm_first:
-            attention_output = self.norm2.forward(attention_output)
+            # attention_output = self.norm2.forward(attention_output)
             attention_output = self.residual2.forward(
                 X=src, output=attention_output
             )
@@ -139,6 +139,6 @@ class TransformerEncoderLayer(MultiHeadAttention):
             attention_output = self.residual2.forward(
                 X=src, output=attention_output
             )
-            attention_output = self.norm2.forward(attention_output)
+            # attention_output = self.norm2.forward(attention_output)
 
         return attention_output

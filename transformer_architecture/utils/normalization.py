@@ -1,9 +1,9 @@
 import torch
-
+import torch.nn as nn
 from torch import Tensor
 
 
-class NormalizationLayer:
+class NormalizationLayer(nn.Module):
     """
     The goal of this class is to
     implement the Layer Normalization
@@ -32,6 +32,7 @@ class NormalizationLayer:
         elementwise_affine: bool = True,
         bias: bool = True,
     ) -> None:
+        super().__init__()
         self.eps = eps
 
         self.elementwise_affine = elementwise_affine
@@ -39,13 +40,13 @@ class NormalizationLayer:
 
         if self.elementwise_affine:
             elementwise_affine_dim = normalized_shape
-            self.gamma = torch.ones(
-                (elementwise_affine_dim), requires_grad=True
+            self.gamma = nn.Parameter(
+                torch.ones((elementwise_affine_dim), requires_grad=True)
             )
 
             if self.bias:
-                self.beta = torch.zeros(
-                    (elementwise_affine_dim), requires_grad=True
+                self.beta = nn.Parameter(
+                    torch.zeros((elementwise_affine_dim), requires_grad=True)
                 )
 
     def forward(self, input: Tensor) -> Tensor:
@@ -62,16 +63,14 @@ class NormalizationLayer:
             after it was normalized
         """
 
-        mean = torch.mean(input, dim=-1, keepdim=True)
-        standard_deviation = torch.std(
-            input, dim=-1, keepdim=True, unbiased=False
-        )
+        mean = input.mean(dim=-1, keepdim=True)
+        standard_deviation = input.std(dim=-1, keepdim=True, unbiased=False)
 
         normalized_input = (input - mean) / (standard_deviation + self.eps)
 
         if self.elementwise_affine:
-            normalized_input *= self.gamma
+            normalized_input = normalized_input * self.gamma
             if self.bias:
-                normalized_input += self.beta
+                normalized_input = normalized_input + self.beta
 
         return normalized_input
