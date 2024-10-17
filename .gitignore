@@ -1,12 +1,11 @@
 #Excluded files
 
-*.pkl
 *.txt
 *.ipynb
 .vscode/
-.data/
-myenv/
-cache/
+*.csv
+*.pth
+*.png
 
 #Except these files
 
