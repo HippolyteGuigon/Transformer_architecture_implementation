@@ -168,10 +168,10 @@ def collate_fn(batch):
 
 # DataLoaders
 train_loader = DataLoader(
-    train_data_sample, batch_size=64, collate_fn=collate_fn
+    train_data_sample, batch_size=16, collate_fn=collate_fn
 )
 valid_loader = DataLoader(
-    valid_data_sample, batch_size=64, collate_fn=collate_fn
+    valid_data_sample, batch_size=16, collate_fn=collate_fn
 )
 
 
@@ -208,7 +208,7 @@ class TransformerWithProjection(nn.Module):
         return self.projection(decoder_output)
 
 
-embedding_dim = 16
+embedding_dim = 8
 num_heads = 4
 vocab_size_fr = len(vocab_fr)
 vocab_size_en = len(vocab_en)
@@ -251,6 +251,12 @@ for epoch in range(10):
         loss = criterion(output, en_batch.view(-1))
         logging.info(f"loss: {loss:.4f}")
         loss.backward()
+
+        for name, param in model.named_parameters():
+            if param.grad is not None:
+                print(f"{name} | Gradient norm: {param.grad.norm().item()}")
+            else:
+                print(f"{name} | No gradient computed")
         optimizer.step()
 
         total_loss += loss.item()
