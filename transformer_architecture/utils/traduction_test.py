@@ -38,7 +38,7 @@ logger.addHandler(file_handler)
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
-df = pd.read_csv("en-fr.csv", nrows=2000)
+df = pd.read_csv("en-fr.csv", nrows=20000)
 df.dropna(subset=["en", "fr"], inplace=True)
 
 
@@ -140,12 +140,12 @@ max_len = get_corpus_max_len(train_data_sample)
 
 train_loader = DataLoader(
     train_data_sample,
-    batch_size=128,
+    batch_size=32,
     collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
 )
 valid_loader = DataLoader(
     valid_data_sample,
-    batch_size=128,
+    batch_size=32,
     collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
 )
 
@@ -182,7 +182,7 @@ class TransformerWithProjection(nn.Module):
         return self.projection(decoder_output)
 
 
-embedding_dim = 8
+embedding_dim = 32
 num_heads = 4
 vocab_size_fr = len(vocab_fr)
 vocab_size_en = len(vocab_en)
@@ -221,14 +221,14 @@ for epoch in range(10):
         )
         output = output.view(-1, vocab_size_en)
         loss = criterion(output, en_batch.view(-1))
-        logging.warning(f"Training Loss: {loss:.4f}")
+        logging.info(f"Training Loss: {loss:.4f}")
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
 
     avg_train_loss = total_loss / len(train_loader)
-    logging.info(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
+    logging.warning(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
 
     model.eval()
     val_loss = 0
