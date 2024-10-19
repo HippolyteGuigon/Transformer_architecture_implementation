@@ -16,44 +16,34 @@ from transformer_architecture.preprocessing.embedding import (
 )
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)  # Permet de capturer tous les logs
+logger.setLevel(logging.DEBUG)
 
-# Crée un handler pour le terminal (StreamHandler)
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(
-    logging.DEBUG
-)  # Affiche tous les niveaux dans le terminal
+stream_handler.setLevel(logging.DEBUG)
 stream_format = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 stream_handler.setFormatter(stream_format)
 
-# Crée un handler pour les warnings et plus (RotatingFileHandler)
 file_handler = RotatingFileHandler(
     "warnings.log", mode="a", maxBytes=5 * 1024 * 1024, backupCount=2
 )
-file_handler.setLevel(
-    logging.WARNING
-)  # Enregistre seulement les warnings et plus
+file_handler.setLevel(logging.WARNING)
 file_format = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(file_format)
 
-# Ajoute les handlers au logger
 logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
-# Tokenizers pour l'anglais et le français
 logging.info("Getting tokenizer")
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
 logging.info("Tokenizer obtained")
 
-# Charger le fichier CSV "en-fr.csv"
 df = pd.read_csv("en-fr.csv", nrows=20000)
 logging.info("Dataset loaded")
 df.dropna(subset=["en", "fr"], inplace=True)
 
 
-# Construire le vocabulaires
 def build_vocab(df):
     def tokenize_pair(data):
         for _, row in data.iterrows():
@@ -69,7 +59,6 @@ def build_vocab(df):
     return vocab
 
 
-# Vocabulaire pour le français et l'anglais
 try:
     with open("vocab_fr.pkl", "rb") as f:
         vocab_fr = pickle.load(f)
@@ -86,7 +75,6 @@ except FileNotFoundError:
     logging.warning("Datasets succesfully built and saved")
 
 
-# Pré-traitement des données
 def tokenize_sentence_pair(item, vocab_fr, vocab_en):
     fr_tokens = (
         [vocab_fr["<bos>"]]
@@ -104,7 +92,6 @@ def tokenize_sentence_pair(item, vocab_fr, vocab_en):
 def preprocess_data(df, vocab_fr, vocab_en):
     tokenized_data = []
     for _, item in df.iterrows():
-        # S'assurer que l'entrée est une chaîne de caractères valide
         if isinstance(item["fr"], str) and isinstance(item["en"], str):
             fr_tokens, en_tokens = tokenize_sentence_pair(
                 item, vocab_fr, vocab_en
@@ -115,7 +102,6 @@ def preprocess_data(df, vocab_fr, vocab_en):
 
 data_sample = preprocess_data(df, vocab_fr, vocab_en)
 
-# Diviser les données en train et validation (80% train, 20% validation)
 train_size = int(0.8 * len(data_sample))
 valid_size = len(data_sample) - train_size
 train_data_sample, valid_data_sample = random_split(
@@ -124,7 +110,6 @@ train_data_sample, valid_data_sample = random_split(
 logging.warning("Data splitting done")
 
 
-# Longueur max pour l'encodage positionnel
 def get_corpus_max_len(data_sample):
     fr_max_len = max(len(s[0]) for s in data_sample)
     en_max_len = max(len(s[1]) for s in data_sample)
@@ -134,7 +119,6 @@ def get_corpus_max_len(data_sample):
 max_len = get_corpus_max_len(train_data_sample)
 
 
-# Padding
 def pad_sentences(fr_batch, en_batch, max_len):
     fr_batch_padded = [
         torch.cat(
@@ -166,7 +150,6 @@ def collate_fn(batch):
     return pad_sentences(fr_batch, en_batch, max_len)
 
 
-# DataLoaders
 train_loader = DataLoader(
     train_data_sample, batch_size=16, collate_fn=collate_fn
 )
@@ -175,7 +158,6 @@ valid_loader = DataLoader(
 )
 
 
-# Modèle
 class TransformerWithProjection(nn.Module):
     def __init__(
         self, embedding_dim, num_heads, vocab_size_fr, vocab_size_en, max_len
@@ -224,14 +206,12 @@ model = TransformerWithProjection(
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
 
-# Entraînement avec validation
 
 logging.info("Model training has begun")
 for epoch in range(10):
     model.train()
     total_loss = 0
 
-    # Boucle d'entraînement
     for fr_batch, en_batch in train_loader:
         optimizer.zero_grad()
         tgt_mask = torch.triu(
@@ -252,22 +232,14 @@ for epoch in range(10):
         logging.info(f"loss: {loss:.4f}")
         loss.backward()
 
-        for name, param in model.named_parameters():
-            if param.grad is not None:
-                print(f"{name} | Gradient norm: {param.grad.norm().item()}")
-            else:
-                print(f"{name} | No gradient computed")
-        optimizer.step()
-
         total_loss += loss.item()
 
     avg_train_loss = total_loss / len(train_loader)
     logging.warning(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
 
-    # Validation
     model.eval()
     val_loss = 0
-    with torch.no_grad():  # Désactiver la backpropagation pour la validation
+    with torch.no_grad():
         for fr_batch, en_batch in valid_loader:
             tgt_mask = torch.triu(
                 torch.ones(en_batch.size(1), en_batch.size(1))
@@ -291,7 +263,6 @@ for epoch in range(10):
     avg_val_loss = val_loss / len(valid_loader)
     logging.warning(f"Epoch {epoch}, Validation Loss: {avg_val_loss}")
 
-    # Sauvegarder le modèle et l'état de l'optimiseur après chaque epoch
     torch.save(
         {
             "epoch": epoch,
