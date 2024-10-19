@@ -6,6 +6,7 @@
 *.csv
 *.pth
 *.png
+*.pkl
 myenv/
 
 #Except these files
