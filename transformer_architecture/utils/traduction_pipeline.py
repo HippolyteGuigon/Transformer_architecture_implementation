@@ -46,6 +46,7 @@ tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 if not os.path.exists("vocab_fr.pkl") and not os.path.exists("vocab_en.pkl"):
     logging.info("Loading dataset...")
     df = pd.read_csv("en-fr.csv")
+    df = df.sample(500000)
     df.dropna(subset=["en", "fr"], inplace=True)
     logging.info("Dataset loaded !")
 
