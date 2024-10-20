@@ -126,12 +126,13 @@ class TransformerDecoderLayer(MultiHeadAttention):
 
         super()._create_attention_matrices(tgt)
         Q, K, V = super().split_heads()
+
         attention_output = super().forward(
             key=K, query=Q, value=V, masking=True
         )
 
         if self.norm_first:
-            attention_output = self.norm1.forward(attention_output)
+            attention_output = self.norm1(attention_output)
             attention_output = self.residual1.forward(
                 X=tgt, output=attention_output
             )
@@ -139,40 +140,40 @@ class TransformerDecoderLayer(MultiHeadAttention):
             attention_output = self.residual1.forward(
                 X=tgt, output=attention_output
             )
-            attention_output = self.norm1.forward(attention_output)
+            attention_output = self.norm1(attention_output)
 
-        cross_attention_output = super()._cross_attention(
-            query=tgt, key=memory, value=memory
-        )
+        Q_cross = self.query_layer(attention_output)
+        K_cross = self.key_layer(memory)
+        V_cross = self.value_layer(memory)
 
-        cross_attention_output = super()._cross_attention(
-            query=tgt, key=memory, value=memory
+        attention_output = super()._cross_attention(
+            query=Q_cross, key=K_cross, value=V_cross
         )
 
         if self.norm_first:
-            cross_attention_output = self.norm2.forward(attention_output)
-            cross_attention_output = self.residual2.forward(
-                X=tgt, output=cross_attention_output
+            attention_output = self.norm2(attention_output)
+            attention_output = self.residual2.forward(
+                X=tgt, output=attention_output
             )
         else:
-            cross_attention_output = self.residual2.forward(
-                X=tgt, output=cross_attention_output
+            attention_output = self.residual2.forward(
+                X=tgt, output=attention_output
             )
-            cross_attention_output = self.norm2.forward(cross_attention_output)
+            attention_output = self.norm2(attention_output)
 
-        cross_attention_output = self.linear1(cross_attention_output)
-        cross_attention_output = self.dropout(cross_attention_output)
-        cross_attention_output = self.linear2(cross_attention_output)
+        attention_output = self.linear1(attention_output)
+        attention_output = self.dropout(attention_output)
+        attention_output = self.linear2(attention_output)
 
         if self.norm_first:
-            cross_attention_output = self.norm3.forward(attention_output)
-            cross_attention_output = self.residual3.forward(
-                X=tgt, output=cross_attention_output
+            attention_output = self.norm3(attention_output)
+            attention_output = self.residual3.forward(
+                X=tgt, output=attention_output
             )
         else:
-            cross_attention_output = self.residual3.forward(
-                X=tgt, output=cross_attention_output
+            attention_output = self.residual3.forward(
+                X=tgt, output=attention_output
             )
-            cross_attention_output = self.norm3.forward(cross_attention_output)
+            attention_output = self.norm3(attention_output)
 
-        return cross_attention_output
+        return attention_output

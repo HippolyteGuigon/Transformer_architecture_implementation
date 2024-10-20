@@ -1,30 +1,9 @@
 import torch
-
+import torch.nn as nn
 from torch import Tensor
 
 
-class NormalizationLayer:
-    """
-    The goal of this class is to
-    implement the Layer Normalization
-    process involved in the Transformer
-    Architecture
-
-    Arguments:
-        -normalized_shape: int: The
-        shape of the element to be normalized
-        -eps: Value added to the denominator
-        for numerical stability
-        -elementwise_affine: bool: If the normalization
-        should have learnable parameter Gamma
-        learnt during the process
-        -bias: bool: Only relevant if elementwise_affine
-        set to True, should a bias be learnt during the
-        normalization process
-    Returns:
-        -None
-    """
-
+class NormalizationLayer(nn.Module):
     def __init__(
         self,
         normalized_shape: int,
@@ -32,21 +11,20 @@ class NormalizationLayer:
         elementwise_affine: bool = True,
         bias: bool = True,
     ) -> None:
+        super().__init__()
         self.eps = eps
-
         self.elementwise_affine = elementwise_affine
         self.bias = bias
 
         if self.elementwise_affine:
-            elementwise_affine_dim = normalized_shape
-            self.gamma = torch.ones(
-                (elementwise_affine_dim), requires_grad=True
-            )
-
+            self.gamma = nn.Parameter(torch.ones(normalized_shape))
             if self.bias:
-                self.beta = torch.zeros(
-                    (elementwise_affine_dim), requires_grad=True
-                )
+                self.beta = nn.Parameter(torch.zeros(normalized_shape))
+            else:
+                self.beta = None
+        else:
+            self.gamma = None
+            self.beta = None
 
     def forward(self, input: Tensor) -> Tensor:
         """
@@ -63,15 +41,13 @@ class NormalizationLayer:
         """
 
         mean = torch.mean(input, dim=-1, keepdim=True)
-        standard_deviation = torch.std(
-            input, dim=-1, keepdim=True, unbiased=False
-        )
-
-        normalized_input = (input - mean) / (standard_deviation + self.eps)
+        variance = torch.var(input, dim=-1, keepdim=True, unbiased=False)
+        standard_deviation = torch.sqrt(variance + self.eps)
+        normalized_input = (input - mean) / (standard_deviation)
 
         if self.elementwise_affine:
-            normalized_input *= self.gamma
+            normalized_input = normalized_input * self.gamma
             if self.bias:
-                normalized_input += self.beta
+                normalized_input = normalized_input + self.beta
 
         return normalized_input
