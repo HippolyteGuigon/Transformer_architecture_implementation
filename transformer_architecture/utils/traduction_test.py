@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import pickle
+import os
 import logging
 import pandas as pd
 from torchtext.data.utils import get_tokenizer
@@ -14,6 +15,7 @@ from transformer_architecture.preprocessing.embedding import (
     Embedding,
     SinusoidalPositionalEncoding,
 )
+from spacy.cli import download
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
 
@@ -35,11 +37,17 @@ file_handler.setFormatter(file_format)
 logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
+download("fr_core_news_sm")
+download("en_core_web_sm")
+
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
-df = pd.read_csv("en-fr.csv", nrows=20000)
-df.dropna(subset=["en", "fr"], inplace=True)
+if not os.path.exists("vocab_fr.pkl") and not os.path.exists("vocab_en.pkl"):
+    logging.info("Loading dataset...")
+    df = pd.read_csv("en-fr.csv")
+    df.dropna(subset=["en", "fr"], inplace=True)
+    logging.info("Dataset loaded !")
 
 
 def get_corpus_max_len(data_sample):
@@ -80,6 +88,7 @@ try:
     with open("vocab_en.pkl", "rb") as f:
         vocab_en = pickle.load(f)
 except FileNotFoundError:
+    logging.info("Building vocab...")
 
     def build_vocab(df):
         def tokenize_pair(data):
@@ -102,6 +111,8 @@ except FileNotFoundError:
         pickle.dump(vocab_fr, f)
     with open("vocab_en.pkl", "wb") as f:
         pickle.dump(vocab_en, f)
+
+    logging.info("Vocab succesfully built !")
 
 
 def tokenize_sentence_pair(item, vocab_fr, vocab_en):
@@ -129,23 +140,25 @@ def preprocess_data(df, vocab_fr, vocab_en):
     return tokenized_data
 
 
+logging.info("Preprocessing dataset...")
 data_sample = preprocess_data(df, vocab_fr, vocab_en)
 train_size = int(0.8 * len(data_sample))
 valid_size = len(data_sample) - train_size
 train_data_sample, valid_data_sample = random_split(
     data_sample, [train_size, valid_size]
 )
+logging.info("Dataset preprocessing is over")
 
 max_len = get_corpus_max_len(train_data_sample)
 
 train_loader = DataLoader(
     train_data_sample,
-    batch_size=32,
+    batch_size=16,
     collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
 )
 valid_loader = DataLoader(
     valid_data_sample,
-    batch_size=32,
+    batch_size=16,
     collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
 )
 
@@ -182,7 +195,7 @@ class TransformerWithProjection(nn.Module):
         return self.projection(decoder_output)
 
 
-embedding_dim = 32
+embedding_dim = 64
 num_heads = 4
 vocab_size_fr = len(vocab_fr)
 vocab_size_en = len(vocab_en)
@@ -199,6 +212,8 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
 
 scorer_rouge = rouge_scorer.RougeScorer(["rouge1", "rougeL"], use_stemmer=True)
+
+logging.info("Model training has begun")
 
 for epoch in range(10):
     model.train()
@@ -224,7 +239,6 @@ for epoch in range(10):
         logging.info(f"Training Loss: {loss:.4f}")
         loss.backward()
         optimizer.step()
-
         total_loss += loss.item()
 
     avg_train_loss = total_loss / len(train_loader)
