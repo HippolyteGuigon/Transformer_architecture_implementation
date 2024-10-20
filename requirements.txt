@@ -5,4 +5,4 @@ rouge_score==0.1.2
 setuptools==69.1.0
 torch==2.0.0
 torchtext==0.15.1
-spacy
+spacy==3.2.0
