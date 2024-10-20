@@ -126,6 +126,7 @@ class TransformerDecoderLayer(MultiHeadAttention):
 
         super()._create_attention_matrices(tgt)
         Q, K, V = super().split_heads()
+
         attention_output = super().forward(
             key=K, query=Q, value=V, masking=True
         )
@@ -141,8 +142,12 @@ class TransformerDecoderLayer(MultiHeadAttention):
             )
             attention_output = self.norm1(attention_output)
 
+        Q_cross = self.query_layer(attention_output)
+        K_cross = self.key_layer(memory)
+        V_cross = self.value_layer(memory)
+
         attention_output = super()._cross_attention(
-            query=tgt, key=memory, value=memory
+            query=Q_cross, key=K_cross, value=V_cross
         )
 
         if self.norm_first:

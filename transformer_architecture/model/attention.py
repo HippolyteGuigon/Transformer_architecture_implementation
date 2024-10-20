@@ -96,11 +96,12 @@ class SelfAttention(Attention):
         if masking:
             mask_size = key.size(-2)
             mask = torch.triu(
-                torch.ones(mask_size, mask_size, device=key.device), diagonal=1
-            )
-            scaled_dot_product = scaled_dot_product.masked_fill(
-                mask == 1, float("-inf")
-            )
+                torch.ones(mask_size, mask_size), diagonal=1
+            ).bool()
+            if not torch.is_floating_point(scaled_dot_product):
+                scaled_dot_product = scaled_dot_product.to(torch.float32)
+
+            scaled_dot_product = scaled_dot_product.masked_fill(mask, -1e9)
 
         attention_scores = softmax(scaled_dot_product, axis=-1)
         attention_scores = torch.matmul(attention_scores, value)
@@ -260,8 +261,9 @@ class MultiHeadAttention(SelfAttention):
 
         batch_size, seq_len, _ = cross_attention_scores.size()
 
-        cross_attention_scores = cross_attention_scores.view(
-            batch_size, seq_len, self.num_heads * self.d_v
+        cross_attention_scores = torch.reshape(
+            cross_attention_scores,
+            (batch_size, seq_len, self.num_heads * self.d_v),
         )
 
         return cross_attention_scores
