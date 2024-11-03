@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import pickle
-import os
+import json
 import logging
 import pandas as pd
 from torchtext.data.utils import get_tokenizer
@@ -43,12 +43,10 @@ download("en_core_web_sm")
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
-if not os.path.exists("vocab_fr.pkl") and not os.path.exists("vocab_en.pkl"):
-    logging.info("Loading dataset...")
-    df = pd.read_csv("en-fr.csv")
-    df = df.sample(500000)
-    df.dropna(subset=["en", "fr"], inplace=True)
-    logging.info("Dataset loaded !")
+logging.info("Loading dataset...")
+df = pd.read_csv("data/en-fr.csv", nrows=6000)
+df.dropna(subset=["en", "fr"], inplace=True)
+logging.info("Dataset loaded !")
 
 
 def get_corpus_max_len(data_sample):
@@ -84,9 +82,9 @@ def pad_sentences(fr_batch, en_batch, max_len):
 
 
 try:
-    with open("vocab_fr.pkl", "rb") as f:
+    with open("data/vocab_fr.pkl", "rb") as f:
         vocab_fr = pickle.load(f)
-    with open("vocab_en.pkl", "rb") as f:
+    with open("data/vocab_en.pkl", "rb") as f:
         vocab_en = pickle.load(f)
 except FileNotFoundError:
     logging.info("Building vocab...")
@@ -108,9 +106,9 @@ except FileNotFoundError:
     vocab_fr = build_vocab(df)
     vocab_en = build_vocab(df)
 
-    with open("vocab_fr.pkl", "wb") as f:
+    with open("data/vocab_fr.pkl", "wb") as f:
         pickle.dump(vocab_fr, f)
-    with open("vocab_en.pkl", "wb") as f:
+    with open("data/vocab_en.pkl", "wb") as f:
         pickle.dump(vocab_en, f)
 
     logging.info("Vocab succesfully built !")
@@ -196,7 +194,7 @@ class TransformerWithProjection(nn.Module):
         return self.projection(decoder_output)
 
 
-embedding_dim = 64
+embedding_dim = 16
 num_heads = 4
 vocab_size_fr = len(vocab_fr)
 vocab_size_en = len(vocab_en)
@@ -215,6 +213,8 @@ criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
 scorer_rouge = rouge_scorer.RougeScorer(["rouge1", "rougeL"], use_stemmer=True)
 
 logging.info("Model training has begun")
+
+overall_metrics = {}
 
 for epoch in range(10):
     model.train()
@@ -316,6 +316,18 @@ for epoch in range(10):
     avg_rouge_1 = total_rouge_1 / num_samples
     avg_rouge_l = total_rouge_l / num_samples
 
+    metrics = {
+        "epoch": epoch,
+        "train_loss": avg_train_loss,
+        "val_loss": avg_val_loss,
+        "bleu_score": avg_bleu,
+        "rouge1_score": avg_rouge_1,
+        "rougeL_score": avg_rouge_l,
+    }
+
+    epoch_key = f"epoch_{epoch}"
+    overall_metrics[epoch_key] = metrics
+
     logging.warning(f"Epoch {epoch}, Validation Loss: {avg_val_loss}")
     logging.warning(f"Epoch {epoch}, Validation BLEU Score: {avg_bleu}")
     logging.warning(f"Epoch {epoch}, Validation ROUGE-1 Score: {avg_rouge_1}")
@@ -329,5 +341,8 @@ for epoch in range(10):
             "train_loss": avg_train_loss,
             "val_loss": avg_val_loss,
         },
-        "checkpoint_last_epoch.pth",
+        "models/checkpoint_last_epoch.pth",
     )
+
+with open("metrics/metrics_epochs.json", "w") as f:
+    json.dump(overall_metrics, f)

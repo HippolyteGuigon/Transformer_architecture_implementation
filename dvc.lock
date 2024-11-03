@@ -1,0 +1,22 @@
+schema: '2.0'
+stages:
+  entrainement_modele:
+    cmd: python transformer_architecture/utils/traduction_pipeline.py
+    deps:
+    - path: data/en-fr.csv
+      hash: md5
+      md5: 31fb079c32301f5e74ef1bed745b6bef
+      size: 8410507707
+    - path: transformer_architecture/utils/traduction_pipeline.py
+      hash: md5
+      md5: dcc6a0c98f9483ad0c47e0fbcd2a019c
+      size: 10993
+    outs:
+    - path: metrics/metrics_epochs.json
+      hash: md5
+      md5: c7bc148dca7243ed372e5b0ebece20af
+      size: 2010
+    - path: models/checkpoint_last_epoch.pth
+      hash: md5
+      md5: a265200505665afa6c3bb96c2cb0c005
+      size: 194515802

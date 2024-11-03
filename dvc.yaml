@@ -1,0 +1,10 @@
+stages:
+  entrainement_modele:
+    cmd: python transformer_architecture/utils/traduction_pipeline.py
+    deps:
+      - transformer_architecture/utils/traduction_pipeline.py
+      - data/en-fr.csv
+    outs:
+      - models/checkpoint_last_epoch.pth
+    metrics:
+      - metrics/metrics_epochs.json
