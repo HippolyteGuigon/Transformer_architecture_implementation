@@ -1,24 +1,23 @@
 import pandas as pd
 import gcsfs
 import random
-from datetime import datetime
 
-print("STARTED")
-current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+from transformer_architecture.configs.confs import load_conf, clean_params
 
-bucket_path = 'gs://french-english-raw-data/en-fr.csv'  
-fraction = 0.01  
-local_output_path = f'transformer_architecture/data/sampled_data_{current_datetime}.csv'  
+main_params = load_conf(include=True)
+main_params = clean_params(main_params)
+
+bucket_path = main_params['bucket_path']
+DATASET_PROPORTION = main_params['DATASET_PROPORTION']
+EXPERIENCE_NAME = main_params['EXPERIENCE_NAME']
+
+local_output_path = f'data/sampled_data_{EXPERIENCE_NAME}.csv'  
 
 dataframe_size=22000000
 
-print("STARTED2")
-
-sample_size = int(dataframe_size * fraction)
+sample_size = int(dataframe_size * DATASET_PROPORTION)
 
 skip_rows = sorted(random.sample(range(1, dataframe_size + 1), dataframe_size - sample_size))
-
-print("STARTED3")
 
 df_sample = pd.read_csv(bucket_path, skiprows=skip_rows)
 

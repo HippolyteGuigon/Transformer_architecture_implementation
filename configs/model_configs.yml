@@ -1,0 +1,6 @@
+learning_rate: 0.02
+num_epochs: 10
+embedding_dim: 16
+num_heads: 4
+batch_size: 16
+train_size: 0.8
