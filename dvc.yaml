@@ -1,0 +1,21 @@
+stages:
+  sample_and_train:
+    cmd: python transformer_architecture/traduction_test/traduction_pipeline.py --output_model
+      models/checkpoint_last_epoch.pth --metrics_path metrics/metrics_epochs.json
+    deps:
+    - transformer_architecture/traduction_test/traduction_pipeline.py
+    params:
+    - configs/dvc_configs.yml:
+      - DATASET_PROPORTION
+      - EXPERIENCE_NAME
+    - configs/model_configs.yml:
+      - batch_size
+      - embedding_dim
+      - learning_rate
+      - num_epochs
+      - num_heads
+    outs:
+    - models/checkpoint_last_epoch.pth
+    metrics:
+    - metrics/metrics_epochs.json:
+        cache: false

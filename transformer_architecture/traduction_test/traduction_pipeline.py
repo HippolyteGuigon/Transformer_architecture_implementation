@@ -4,6 +4,8 @@ import torch.optim as optim
 import pickle
 import json
 import logging
+import subprocess
+import argparse
 import pandas as pd
 from torchtext.data.utils import get_tokenizer
 from torch.utils.data import DataLoader, random_split
@@ -11,6 +13,7 @@ from torchtext.vocab import build_vocab_from_iterator
 from logging.handlers import RotatingFileHandler
 from transformer_architecture.model.encoder import TransformerEncoderLayer
 from transformer_architecture.model.decoder import TransformerDecoderLayer
+from transformer_architecture.configs.confs import load_conf, clean_params
 from transformer_architecture.preprocessing.embedding import (
     Embedding,
     SinusoidalPositionalEncoding,
@@ -18,6 +21,19 @@ from transformer_architecture.preprocessing.embedding import (
 from spacy.cli import download
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
+
+
+main_params = load_conf(include=True)
+main_params = clean_params(main_params)
+
+learning_rate = main_params["learning_rate"]
+num_epochs = main_params["num_epochs"]
+embedding_dim = main_params["embedding_dim"]
+num_heads = main_params["num_heads"]
+batch_size = main_params["batch_size"]
+train_size = main_params["train_size"]
+EXPERIENCE_NAME = main_params["EXPERIENCE_NAME"]
+DATASET_PROPORTION = main_params["DATASET_PROPORTION"]
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -43,10 +59,20 @@ download("en_core_web_sm")
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
+subprocess.run(
+    [
+        "python",
+        "transformer_architecture/traduction_test/data_sampling.py"
+    ],
+    capture_output=True,  
+    text=True,           
+    check=True          
+)
+
 logging.info("Loading dataset...")
-df = pd.read_csv("data/en-fr.csv", nrows=50000)
+df = pd.read_csv(f"data/sampled_data_{EXPERIENCE_NAME}.csv")
 df.dropna(subset=["en", "fr"], inplace=True)
-logging.info("Dataset loaded !")
+logging.info(f"Dataset loaded with {df.shape[0]}!")
 
 
 def get_corpus_max_len(data_sample):
@@ -141,7 +167,7 @@ def preprocess_data(df, vocab_fr, vocab_en):
 
 logging.info("Preprocessing dataset...")
 data_sample = preprocess_data(df, vocab_fr, vocab_en)
-train_size = int(0.8 * len(data_sample))
+train_size = int(train_size * len(data_sample))
 valid_size = len(data_sample) - train_size
 train_data_sample, valid_data_sample = random_split(
     data_sample, [train_size, valid_size]
@@ -152,12 +178,12 @@ max_len = get_corpus_max_len(train_data_sample)
 
 train_loader = DataLoader(
     train_data_sample,
-    batch_size=32,
+    batch_size=batch_size,
     collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
 )
 valid_loader = DataLoader(
     valid_data_sample,
-    batch_size=32,
+    batch_size=batch_size,
     collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
 )
 
@@ -194,8 +220,8 @@ class TransformerWithProjection(nn.Module):
         return self.projection(decoder_output)
 
 
-embedding_dim = 16
-num_heads = 4
+embedding_dim = embedding_dim
+num_heads = num_heads
 vocab_size_fr = len(vocab_fr)
 vocab_size_en = len(vocab_en)
 
@@ -207,7 +233,7 @@ model = TransformerWithProjection(
     max_len=max_len,
 )
 
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
 
 scorer_rouge = rouge_scorer.RougeScorer(["rouge1", "rougeL"], use_stemmer=True)
@@ -216,7 +242,7 @@ logging.info("Model training has begun")
 
 overall_metrics = {}
 
-for epoch in range(10):
+for epoch in range(num_epochs):
     model.train()
     total_loss = 0
 

@@ -1,6 +1,7 @@
 import pandas as pd
 import gcsfs
 import random
+import argparse
 
 from transformer_architecture.configs.confs import load_conf, clean_params
 
@@ -13,7 +14,7 @@ EXPERIENCE_NAME = main_params['EXPERIENCE_NAME']
 
 local_output_path = f'data/sampled_data_{EXPERIENCE_NAME}.csv'  
 
-dataframe_size=22000000
+dataframe_size=22520376
 
 sample_size = int(dataframe_size * DATASET_PROPORTION)
 
