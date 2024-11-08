@@ -268,7 +268,9 @@ class LearnablePositionnalEncoding(PositionalEncoding):
         """
 
         pe = nn.Parameter(
-            torch.normal(size=(self.max_len, self.embedding_dim))
+            torch.normal(
+                mean=0, std=1, size=(self.max_len, self.embedding_dim)
+            )
         )
 
         return pe
