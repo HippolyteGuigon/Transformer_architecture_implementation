@@ -174,7 +174,6 @@ class PositionalEncoding(ABC):
 
 
 class SinusoidalPositionalEncoding(PositionalEncoding):
-
     """
     The goal of this class is to implement
     the sinusoidal positionnal encoding to
@@ -214,6 +213,63 @@ class SinusoidalPositionalEncoding(PositionalEncoding):
             pe[:, ::2] = torch.sin(position * div_term)
             pe[:, 1::2] = torch.cos(position * div_term)
             del position, div_term
+
+        return pe
+
+    def add_positional_encoding(self, data: Tensor) -> Tensor:
+        """
+        The goal of this abstract method is to
+        add positional encoding to the input
+        sequence
+
+        Arguments:
+            -data: Tensor: The input data
+            to which positional encoding will
+            be added
+        Returns:
+            -encoded_data: Tensor: The data once
+            transformed with positional encoding
+        """
+
+        encoded_data = data + self.pe
+
+        return encoded_data
+
+
+class LearnablePositionnalEncoding(PositionalEncoding):
+    """
+    The goal of this class is to implement
+    positionnal encoding that will be learnt
+    during the training process through the
+    backpropagation process
+
+    Arguments:
+        -None
+    Returns:
+        -None
+    """
+
+    def __init__(self, max_len: int, embedding_dim: int) -> None:
+        super().__init__(max_len=max_len, embedding_dim=embedding_dim)
+        self.max_len = max_len
+        self.embedding_dim = embedding_dim
+
+    def _init_positional_encoding(self) -> Tensor:
+        """
+        The goal of this method is to compute
+        the learnable positional encoding and
+        add it to the data
+
+        Arguments:
+            -None
+        Returns:
+            -pe: Tensor: The positional
+            encoding tensor
+        """
+
+        pe = nn.Parameter(
+            torch.normal(size=(self.max_len, self.embedding_dim))
+        )
 
         return pe
 
