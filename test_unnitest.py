@@ -9,6 +9,7 @@ from transformer_architecture.preprocessing.embedding import (
     DataPreprocessor,
     Embedding,
     SinusoidalPositionalEncoding,
+    LearnablePositionnalEncoding,
 )
 from transformer_architecture.utils.activation import softmax, relu, sigmoid
 from transformer_architecture.model.attention import MultiHeadAttention
@@ -51,17 +52,31 @@ class Test(unittest.TestCase):
         positionnal_encoding = SinusoidalPositionalEncoding(
             max_len=longest_sentence_word, embedding_dim=embedding_dim
         )
+        learnable_positionnal_encoding = LearnablePositionnalEncoding(
+            max_len=longest_sentence_word, embedding_dim=embedding_dim
+        )
+
         positionnal_encoding._init_positional_encoding()
+        learnable_positionnal_encoding._init_positional_encoding()
 
         sentence_indices = preprocessor.get_indices()
         embeddings = embedder.embed(sentence_indices)
         embeddings = positionnal_encoding.add_positional_encoding(embeddings)
+        learnable_embeddings = (
+            learnable_positionnal_encoding.add_positional_encoding(embeddings)
+        )
 
         embedded_dim = embeddings.size()
+        learnable_embedded_dim = learnable_embeddings.size()
 
         self.assertEqual(
             number_sentences,
             embedded_dim[0],
+            "Mismatch in number of sentences",
+        )
+        self.assertEqual(
+            number_sentences,
+            learnable_embedded_dim[0],
             "Mismatch in number of sentences",
         )
         self.assertEqual(
@@ -70,7 +85,17 @@ class Test(unittest.TestCase):
             "Mismatch in the length of the longest sentence",
         )
         self.assertEqual(
+            longest_sentence_word,
+            learnable_embedded_dim[1],
+            "Mismatch in the length of the longest sentence",
+        )
+        self.assertEqual(
             embedding_dim, embedded_dim[2], "Mismatch in embedding dimensions"
+        )
+        self.assertEqual(
+            embedding_dim,
+            learnable_embedded_dim[2],
+            "Mismatch in embedding dimensions",
         )
 
     def test_activation_function(self) -> None:
