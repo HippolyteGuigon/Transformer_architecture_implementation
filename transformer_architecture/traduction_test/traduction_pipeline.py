@@ -5,7 +5,7 @@ import pickle
 import json
 import logging
 import subprocess
-import argparse
+import os
 import pandas as pd
 from torchtext.data.utils import get_tokenizer
 from torch.utils.data import DataLoader, random_split
@@ -17,8 +17,8 @@ from transformer_architecture.configs.confs import load_conf, clean_params
 from transformer_architecture.preprocessing.embedding import (
     Embedding,
     SinusoidalPositionalEncoding,
+    LearnablePositionnalEncoding,
 )
-from spacy.cli import download
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
 
@@ -53,20 +53,25 @@ file_handler.setFormatter(file_format)
 logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
-download("fr_core_news_sm")
-download("en_core_web_sm")
+subprocess.run(
+    ["python", "-m", "spacy", "download", "fr_core_news_sm"],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+subprocess.run(
+    ["python", "-m", "spacy", "download", "en_core_web_sm"],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
 
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
 subprocess.run(
-    [
-        "python",
-        "transformer_architecture/traduction_test/data_sampling.py"
-    ],
-    capture_output=True,  
-    text=True,           
-    check=True          
+    ["python", "transformer_architecture/traduction_test/data_sampling.py"],
+    capture_output=True,
+    text=True,
+    check=True,
 )
 
 logging.info("Loading dataset...")
@@ -107,12 +112,12 @@ def pad_sentences(fr_batch, en_batch, max_len):
     return torch.stack(fr_batch_padded), torch.stack(en_batch_padded)
 
 
-try:
+if os.path.exists("data/vocab_fr.pkl") and os.path.exists("data/vocab_en.pkl"):
     with open("data/vocab_fr.pkl", "rb") as f:
         vocab_fr = pickle.load(f)
     with open("data/vocab_en.pkl", "rb") as f:
         vocab_en = pickle.load(f)
-except FileNotFoundError:
+else:
     logging.info("Building vocab...")
 
     def build_vocab(df):
@@ -190,13 +195,15 @@ valid_loader = DataLoader(
 
 class TransformerWithProjection(nn.Module):
     def __init__(
-        self, embedding_dim, num_heads, vocab_size_fr, vocab_size_en, max_len
+        self,
+        embedding_dim,
+        num_heads,
+        vocab_size_en,
+        max_len,
+        learnable_encoding: bool = False,
     ):
         super(TransformerWithProjection, self).__init__()
         self.embedder = Embedding(embedding_dim=embedding_dim)
-        self.positionnal_encoding = SinusoidalPositionalEncoding(
-            max_len=max_len, embedding_dim=embedding_dim
-        )
         self.encoder = TransformerEncoderLayer(
             d_model=embedding_dim, num_heads=num_heads, norm_first=True
         )
@@ -204,6 +211,17 @@ class TransformerWithProjection(nn.Module):
             d_model=embedding_dim, num_heads=num_heads, norm_first=True
         )
         self.projection = nn.Linear(embedding_dim, vocab_size_en)
+        self.parameters_to_optimize = list(self.parameters())
+
+        if learnable_encoding:
+            self.positionnal_encoding = LearnablePositionnalEncoding(
+                max_len=max_len, embedding_dim=embedding_dim
+            )
+            self.parameters_to_optimize += [self.positionnal_encoding.pe]
+        else:
+            self.positionnal_encoding = SinusoidalPositionalEncoding(
+                max_len=max_len, embedding_dim=embedding_dim
+            )
 
     def forward(self, src, tgt, tgt_mask=None, memory_mask=None):
         src_emb = self.embedder.embed(src)
@@ -228,12 +246,13 @@ vocab_size_en = len(vocab_en)
 model = TransformerWithProjection(
     embedding_dim=embedding_dim,
     num_heads=num_heads,
-    vocab_size_fr=vocab_size_fr,
     vocab_size_en=vocab_size_en,
     max_len=max_len,
+    learnable_encoding=True,
 )
 
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = optim.Adam(model.parameters_to_optimize, lr=learning_rate)
+
 criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
 
 scorer_rouge = rouge_scorer.RougeScorer(["rouge1", "rougeL"], use_stemmer=True)
@@ -265,6 +284,7 @@ for epoch in range(num_epochs):
         loss = criterion(output, en_batch.view(-1))
         logging.info(f"Training Loss: {loss:.4f}")
         loss.backward()
+
         optimizer.step()
         total_loss += loss.item()
 
