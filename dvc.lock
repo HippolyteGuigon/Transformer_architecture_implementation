@@ -1,0 +1,29 @@
+schema: '2.0'
+stages:
+  sample_and_train:
+    cmd: python transformer_architecture/traduction_test/traduction_pipeline.py --output_model
+      models/checkpoint_last_epoch.pth --metrics_path metrics/metrics_epochs.json
+    deps:
+    - path: transformer_architecture/traduction_test/traduction_pipeline.py
+      hash: md5
+      md5: 49a6990d483dff30a586ace91b205053
+      size: 11818
+    params:
+      configs/dvc_configs.yml:
+        DATASET_PROPORTION: 0.0002
+        EXPERIENCE_NAME: benchmark_3.0
+      configs/model_configs.yml:
+        batch_size: 16
+        embedding_dim: 8
+        learning_rate: 0.02
+        num_epochs: 3
+        num_heads: 4
+    outs:
+    - path: metrics/metrics_epochs.json
+      hash: md5
+      md5: 52bcb805efb049ddac91badaa430536f
+      size: 606
+    - path: models/checkpoint_last_epoch.pth
+      hash: md5
+      md5: 755ce305096370a15280c93abc42275e
+      size: 99175706
