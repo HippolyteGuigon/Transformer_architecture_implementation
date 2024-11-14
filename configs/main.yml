@@ -1,2 +1,0 @@
-dvc_configs: !include dvc_configs.yml
-model_configs: !include model_configs.yml

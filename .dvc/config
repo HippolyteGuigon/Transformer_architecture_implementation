@@ -1,4 +1,0 @@
-[core]
-    remote = gcp_remote
-['remote "gcp_remote"']
-    url = gs://french-english-raw-data
