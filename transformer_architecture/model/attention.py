@@ -7,7 +7,7 @@ from typing import Tuple
 from abc import ABC, abstractmethod
 from transformer_architecture.utils.activation import softmax
 from transformer_architecture.preprocessing.embedding import (
-    RotaryPositionnalEncoding,
+    RotaryPositionnalEmbedding,
 )
 
 
@@ -166,7 +166,7 @@ class MultiHeadAttention(SelfAttention):
             by the dimension of the embedding"
 
         if self.rotary_encoding:
-            self.rotary_encoder = RotaryPositionnalEncoding(
+            self.rotary_encoder = RotaryPositionnalEmbedding(
                 d_model=self.embedding_dim
             )
 

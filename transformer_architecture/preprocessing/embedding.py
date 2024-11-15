@@ -173,7 +173,7 @@ class PositionalEncoding(ABC):
         pass
 
 
-class RotaryPositionnalEncoding(nn.Module):
+class RotaryPositionnalEmbedding(nn.Module):
     """
     The goal of this class is to implement
     the Rotary Positionnal encoding to key
@@ -188,7 +188,7 @@ class RotaryPositionnalEncoding(nn.Module):
     """
 
     def __init__(self, d_model, max_len=512):
-        super(RotaryPositionnalEncoding, self).__init__()
+        super(RotaryPositionnalEmbedding, self).__init__()
         self.d_model = d_model
         self.max_len = max_len
 
