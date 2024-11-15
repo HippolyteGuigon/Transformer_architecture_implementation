@@ -173,6 +173,61 @@ class PositionalEncoding(ABC):
         pass
 
 
+class RotaryPositionnalEncoding(nn.Module):
+    """
+    The goal of this class is to implement
+    the Rotary Positionnal encoding to key
+    and query matrices once they are computed
+
+    Arguments:
+        -d_model :int: Embedding dimension
+        -max_len :int: Maximum length of input
+        sequence
+    Returns:
+        -None
+    """
+
+    def __init__(self, d_model, max_len=512):
+        super(RotaryPositionnalEncoding, self).__init__()
+        self.d_model = d_model
+        self.max_len = max_len
+
+        self.position = torch.arange(0, max_len).unsqueeze(1).float()
+
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2).float()
+            * (-math.log(10000.0) / d_model)
+        )
+        self.div_term = div_term
+
+    def forward(self, seq_len, device="cpu") -> torch.Tensor:
+        """
+        The goal of this function is applying
+        RoPE to Key and Query matrices
+
+        Args:
+            seq_len: int: The length of the sequence to be
+            processed
+            device: str: device on which calculus should be
+            made
+
+        Returns:
+            sinusoids: torch.Tensor: Rotation matrix for
+            key and queries
+        """
+
+        position = self.position[:seq_len, :]
+        div_term = self.div_term.unsqueeze(0)
+
+        sinusoids = torch.cat(
+            [torch.sin(position * div_term), torch.cos(position * div_term)],
+            dim=-1,
+        )
+        sinusoids = sinusoids.to(device)
+
+        return sinusoids
+
+
 class SinusoidalPositionalEncoding(PositionalEncoding):
     """
     The goal of this class is to implement
