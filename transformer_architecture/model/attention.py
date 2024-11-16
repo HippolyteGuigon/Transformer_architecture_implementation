@@ -73,6 +73,9 @@ class SelfAttention(Attention):
         query: Tensor,
         value: Tensor,
         masking: bool = False,
+        differential_key: Tensor = None,
+        differentiall_query: Tensor = None,
+        lambda_diff: float = None,
     ) -> Tensor:
         """
         The goal of this method is to calculate
@@ -88,6 +91,15 @@ class SelfAttention(Attention):
             attention head
             -masking: bool: Wether the attention matrix
             is masked
+            -differential_key: Tensor: If differential
+            attention is to be used, the differential
+            key matrix
+            -differential_query: Tensor: If differential
+            attention is to be used, the differential
+            query matrix
+            -lambda_diff: float: If differential
+            attention is to be used, the lambda
+            to be used
         Returns:
             -attention_score: Tensor: The attention
             score output
@@ -95,6 +107,26 @@ class SelfAttention(Attention):
 
         dot_product = torch.matmul(query, key.transpose(-2, -1))
         scaled_dot_product = dot_product / math.sqrt(self.d_k)
+
+        if differential_key is not None and differentiall_query is not None:
+            differential_dot_product = torch.matmul(
+                differentiall_query, differential_key.transpose(-2, -1)
+            )
+            differential_scaled_dot_product = (
+                differential_dot_product / math.sqrt(self.d_k)
+            )
+            attention_scores = softmax(scaled_dot_product, axis=-1)
+            differential_attention_scores = softmax(
+                differential_scaled_dot_product, axis=-1
+            )
+            differential_attention_scores = (
+                attention_scores - lambda_diff * differential_attention_scores
+            )
+            attention_scores = torch.matmul(
+                differential_attention_scores, value
+            )
+
+            return attention_scores
 
         if masking:
             mask_size = key.size(-2)
@@ -107,6 +139,7 @@ class SelfAttention(Attention):
             scaled_dot_product = scaled_dot_product.masked_fill(mask, -1e9)
 
         attention_scores = softmax(scaled_dot_product, axis=-1)
+
         attention_scores = torch.matmul(attention_scores, value)
 
         return attention_scores
@@ -131,6 +164,9 @@ class MultiHeadAttention(SelfAttention):
         -rotary_encoding: bool: Whether
         rotary positionnal encoding should
         be applied
+        -differential_attention: bool: Whether
+        the differential attention mechanism
+        should be used
     Returns:
         -None
     """
@@ -142,6 +178,7 @@ class MultiHeadAttention(SelfAttention):
         d_k: int,
         d_v: int,
         rotary_encoding: bool = False,
+        differential_attention: bool = False,
     ) -> None:
         super().__init__()
 
@@ -159,6 +196,7 @@ class MultiHeadAttention(SelfAttention):
         self.embedding_dim = embedding_dim
 
         self.rotary_encoding = rotary_encoding
+        self.differential_attention = differential_attention
 
         assert (
             self.embedding_dim % self.num_heads == 0
@@ -168,6 +206,11 @@ class MultiHeadAttention(SelfAttention):
         if self.rotary_encoding:
             self.rotary_encoder = RotaryPositionnalEmbedding(
                 d_model=self.embedding_dim
+            )
+
+        if self.differential_attention:
+            self.lambda_diff = nn.Parameter(
+                torch.tensor(0.5), requires_grad=True
             )
 
     def _create_attention_matrices(self, embeddings: Tensor) -> None:
@@ -228,7 +271,15 @@ class MultiHeadAttention(SelfAttention):
 
         return Q_heads, K_heads, V_heads
 
-    def forward(self, key, query, value, masking: bool = False) -> Tensor:
+    def forward(
+        self,
+        key,
+        query,
+        value,
+        differential_key: torch.Tensor = None,
+        differential_query: torch.Tensor = None,
+        masking: bool = False,
+    ) -> Tensor:
         """
         The goal of this function is to
         compute the self-attention score
@@ -253,7 +304,20 @@ class MultiHeadAttention(SelfAttention):
             head
         """
 
-        attention_scores = super().forward(key, query, value, masking=masking)
+        if self.differential_attention:
+            attention_scores = super().forward(
+                key,
+                query,
+                value,
+                masking=masking,
+                differential_key=differential_key,
+                differentiall_query=differential_query,
+                lambda_diff=self.lambda_diff,
+            )
+        else:
+            attention_scores = super().forward(
+                key, query, value, masking=masking
+            )
 
         batch_size, _, seq_len, _ = attention_scores.size()
 
