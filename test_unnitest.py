@@ -198,12 +198,12 @@ class Test(unittest.TestCase):
                     required",
         )
 
-    def test_differential(self) -> None:
+    def test_differential_transformer(self) -> None:
         """
         The goal of this test is to check if
-        the implementation of the rotary
-        positionnal encoding works when
-        applied in the self-attention mechanism
+        the implementation of the differential
+        transformer works when applied in the
+        self-attention mechanism
 
         Arguments:
             -None
