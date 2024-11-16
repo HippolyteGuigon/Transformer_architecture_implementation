@@ -209,8 +209,26 @@ class MultiHeadAttention(SelfAttention):
             )
 
         if self.differential_attention:
-            self.lambda_diff = nn.Parameter(
-                torch.tensor(0.5), requires_grad=True
+            self.lambda_init = 0.8 - 0.6 * math.exp(-0.3 * 10)
+            self.lambda_q1 = nn.Parameter(
+                torch.zeros(self.num_heads, dtype=torch.float32).normal_(
+                    mean=0, std=0.1
+                )
+            )
+            self.lambda_q2 = nn.Parameter(
+                torch.zeros(self.num_heads, dtype=torch.float32).normal_(
+                    mean=0, std=0.1
+                )
+            )
+            self.lambda_k1 = nn.Parameter(
+                torch.zeros(self.num_heads, dtype=torch.float32).normal_(
+                    mean=0, std=0.1
+                )
+            )
+            self.lambda_k2 = nn.Parameter(
+                torch.zeros(self.num_heads, dtype=torch.float32).normal_(
+                    mean=0, std=0.1
+                )
             )
 
     def _create_attention_matrices(self, embeddings: Tensor) -> None:
@@ -305,6 +323,14 @@ class MultiHeadAttention(SelfAttention):
         """
 
         if self.differential_attention:
+            lambda_1 = torch.exp(
+                torch.dot(self.lambda_q1, self.lambda_k1)
+            ).float()
+            lambda_2 = torch.exp(
+                torch.dot(self.lambda_q2, self.lambda_k2)
+            ).float()
+            lambda_value = lambda_1 - lambda_2 + self.lambda_init
+
             attention_scores = super().forward(
                 key,
                 query,
@@ -312,7 +338,7 @@ class MultiHeadAttention(SelfAttention):
                 masking=masking,
                 differential_key=differential_key,
                 differentiall_query=differential_query,
-                lambda_diff=self.lambda_diff,
+                lambda_diff=lambda_value,
             )
         else:
             attention_scores = super().forward(
