@@ -194,6 +194,7 @@ class MultiHeadAttention(SelfAttention):
         self.d_v = d_v
         self.num_heads = num_heads
         self.embedding_dim = embedding_dim
+        self.head_dim = (self.embedding_dim // self.num_heads) // 2
 
         self.rotary_encoding = rotary_encoding
         self.differential_attention = differential_attention
@@ -211,22 +212,22 @@ class MultiHeadAttention(SelfAttention):
         if self.differential_attention:
             self.lambda_init = 0.8 - 0.6 * math.exp(-0.3 * 10)
             self.lambda_q1 = nn.Parameter(
-                torch.zeros(self.num_heads, dtype=torch.float32).normal_(
+                torch.zeros(self.head_dim, dtype=torch.float32).normal_(
                     mean=0, std=0.1
                 )
             )
             self.lambda_q2 = nn.Parameter(
-                torch.zeros(self.num_heads, dtype=torch.float32).normal_(
+                torch.zeros(self.head_dim, dtype=torch.float32).normal_(
                     mean=0, std=0.1
                 )
             )
             self.lambda_k1 = nn.Parameter(
-                torch.zeros(self.num_heads, dtype=torch.float32).normal_(
+                torch.zeros(self.head_dim, dtype=torch.float32).normal_(
                     mean=0, std=0.1
                 )
             )
             self.lambda_k2 = nn.Parameter(
-                torch.zeros(self.num_heads, dtype=torch.float32).normal_(
+                torch.zeros(self.head_dim, dtype=torch.float32).normal_(
                     mean=0, std=0.1
                 )
             )
