@@ -6,6 +6,9 @@ from torch import Tensor
 from typing import Tuple
 from abc import ABC, abstractmethod
 from transformer_architecture.utils.activation import softmax
+from transformer_architecture.preprocessing.embedding import (
+    RotaryPositionnalEmbedding,
+)
 
 
 class Attention(ABC, nn.Module):
@@ -125,12 +128,20 @@ class MultiHeadAttention(SelfAttention):
         the key matrix
         -d_v: int: The dimension of
         the value matrix
+        -rotary_encoding: bool: Whether
+        rotary positionnal encoding should
+        be applied
     Returns:
         -None
     """
 
     def __init__(
-        self, embedding_dim: int, num_heads: int, d_k: int, d_v: int
+        self,
+        embedding_dim: int,
+        num_heads: int,
+        d_k: int,
+        d_v: int,
+        rotary_encoding: bool = False,
     ) -> None:
         super().__init__()
 
@@ -147,10 +158,17 @@ class MultiHeadAttention(SelfAttention):
         self.num_heads = num_heads
         self.embedding_dim = embedding_dim
 
+        self.rotary_encoding = rotary_encoding
+
         assert (
             self.embedding_dim % self.num_heads == 0
         ), "The number of heads must be divisible\
             by the dimension of the embedding"
+
+        if self.rotary_encoding:
+            self.rotary_encoder = RotaryPositionnalEmbedding(
+                d_model=self.embedding_dim
+            )
 
     def _create_attention_matrices(self, embeddings: Tensor) -> None:
         """
@@ -170,6 +188,15 @@ class MultiHeadAttention(SelfAttention):
         self.query = self.query_layer(embeddings).to(self.device)
         self.key = self.key_layer(embeddings).to(self.device)
         self.value = self.value_layer(embeddings).to(self.device)
+
+        if self.rotary_encoding:
+            seq_len = self.query.shape[1]
+            self.query = self.query * self.rotary_encoder.forward(
+                seq_len, self.query
+            )
+            self.key = self.key * self.rotary_encoder.forward(
+                seq_len, self.key
+            )
 
     def split_heads(self) -> Tuple[Tensor, Tensor, Tensor]:
         """

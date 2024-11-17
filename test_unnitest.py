@@ -128,6 +128,76 @@ class Test(unittest.TestCase):
         self.assertTrue(is_valid_sigmoid)
         self.assertGreaterEqual(min_relu_results, 0)
 
+    def test_rotary_positionnal_encoding(self) -> None:
+        """
+        The goal of this test is to check if
+        the implementation of the rotary
+        positionnal encoding works when
+        applied in the self-attention mechanism
+
+        Arguments:
+            -None
+        Returns:
+            -None
+        """
+
+        embedding_dim = 16
+        key_dimension = 8
+        value_dimension = 4
+        num_heads = 2
+
+        embedder = Embedding(embedding_dim=embedding_dim)
+
+        multi_head_attention = MultiHeadAttention(
+            embedding_dim=embedding_dim,
+            num_heads=num_heads,
+            d_k=key_dimension,
+            d_v=value_dimension,
+            rotary_encoding=True,
+        )
+
+        text = webtext.raw("pirates.txt")
+
+        sentences = sent_tokenize(text)
+
+        number_sentences = len(sentences)
+        longest_sentence_word = max(len(s.split()) for s in sentences)
+
+        preprocessor = DataPreprocessor(sentences)
+
+        sentence_indices = preprocessor.get_indices()
+        embeddings = embedder.embed(sentence_indices)
+
+        multi_head_attention._create_attention_matrices(embeddings)
+
+        Q, K, V = multi_head_attention.split_heads()
+
+        attention_output = multi_head_attention.forward(
+            key=K, query=Q, value=V
+        )
+
+        attention_output_size = attention_output.size()
+
+        self.assertEqual(
+            number_sentences,
+            attention_output_size[0],
+            "Attention value output mismatches the\
+                number of sentences in its final dimensions",
+        )
+        self.assertEqual(
+            longest_sentence_word,
+            attention_output_size[1],
+            "Attention value output mismatches the\
+                longest sentence word in its final dimensions",
+        )
+        self.assertEqual(
+            num_heads * value_dimension,
+            attention_output_size[2],
+            "Attention value output mismatches the\
+                number of heads and value dimension\
+                    required",
+        )
+
     def test_self_attention_mechanism(self) -> None:
         """
         The goal of this test is to check if
@@ -153,6 +223,7 @@ class Test(unittest.TestCase):
             num_heads=num_heads,
             d_k=key_dimension,
             d_v=value_dimension,
+            rotary_encoding=False,
         )
 
         text = webtext.raw("pirates.txt")
