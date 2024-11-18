@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import pandas as pd
 import torchtext
 import pickle
 import json
 import logging
 import subprocess
 import os
-import pandas as pd
+import gc
 from typing import List, Tuple, Optional
 from torchtext.data.utils import get_tokenizer
 from torch.utils.data import DataLoader, random_split
@@ -257,6 +258,10 @@ valid_size = len(data_sample) - train_size
 train_data_sample, valid_data_sample = random_split(
     data_sample, [train_size, valid_size]
 )
+
+del df
+gc.collect()
+
 logging.info("Dataset preprocessing is over")
 
 max_len = get_corpus_max_len(train_data_sample)
