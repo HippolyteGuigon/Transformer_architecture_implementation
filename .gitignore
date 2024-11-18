@@ -9,6 +9,7 @@
 *.pkl
 myenv/
 french-english-traduction-auth.json
+*.json
 
 #Except these files
 
@@ -178,5 +179,4 @@ cython_debug/
 #.idea/
 /data
 /models
-/metrics.json
 french-english-traduction-auth.json

@@ -1,12 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchtext
 import pickle
 import json
 import logging
 import subprocess
 import os
 import pandas as pd
+from typing import List, Tuple, Optional
 from torchtext.data.utils import get_tokenizer
 from torch.utils.data import DataLoader, random_split
 from torchtext.vocab import build_vocab_from_iterator
@@ -32,8 +34,7 @@ embedding_dim = main_params["embedding_dim"]
 num_heads = main_params["num_heads"]
 batch_size = main_params["batch_size"]
 train_size = main_params["train_size"]
-EXPERIENCE_NAME = main_params["EXPERIENCE_NAME"]
-DATASET_PROPORTION = main_params["DATASET_PROPORTION"]
+nrows = main_params["nrows"]
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -67,26 +68,79 @@ subprocess.run(
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
-subprocess.run(
-    ["python", "transformer_architecture/traduction_test/data_sampling.py"],
-    capture_output=True,
-    text=True,
-    check=True,
-)
-
 logging.info("Loading dataset...")
-df = pd.read_csv(f"data/sampled_data_{EXPERIENCE_NAME}.csv")
+df = pd.read_csv("data/en-fr.csv", nrows=nrows)
 df.dropna(subset=["en", "fr"], inplace=True)
 logging.info(f"Dataset loaded with {df.shape[0]}!")
 
 
-def get_corpus_max_len(data_sample):
+def get_corpus_max_len(
+    data_sample: List[Tuple[torch.Tensor, torch.Tensor]]
+) -> int:
+    """
+    Computes the maximum length of sequences in the dataset.
+
+    Arguments:
+        - data_sample: List[Tuple[torch.Tensor, torch.Tensor]]:
+        A list of tokenized sentence pairs.
+
+    Returns:
+        - max_length: int: The maximum length of
+        sequences found in the dataset.
+    """
+
     fr_max_len = max(len(s[0]) for s in data_sample)
     en_max_len = max(len(s[1]) for s in data_sample)
     return max(fr_max_len, en_max_len)
 
 
-def pad_sentences(fr_batch, en_batch, max_len):
+def build_vocab(df: pd.DataFrame) -> torchtext.vocab.Vocab:
+    """
+    Builds a vocabulary object from tokenized sentence pairs.
+
+    Arguments:
+        - df: pd.DataFrame: The dataset containing
+        sentence pairs in two languages.
+
+    Returns:
+        - vocab: Vocab: A vocabulary object with
+        special tokens initialized.
+    """
+
+    def tokenize_pair(data):
+        for _, row in data.iterrows():
+            if isinstance(row["fr"], str) and isinstance(row["en"], str):
+                yield tokenizer_fr(row["fr"])
+                yield tokenizer_en(row["en"])
+
+    vocab = build_vocab_from_iterator(
+        tokenize_pair(df),
+        specials=["<unk>", "<pad>", "<bos>", "<eos>"],
+    )
+    vocab.set_default_index(vocab["<unk>"])
+    return vocab
+
+
+def pad_sentences(
+    fr_batch: List[torch.Tensor], en_batch: List[torch.Tensor], max_len: int
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Pads sentences in French and English batches to the same maximum length.
+
+    Arguments:
+        - fr_batch: List[torch.Tensor]: The list of French
+        sentences represented as tensors.
+        - en_batch: List[torch.Tensor]: The list of English
+        sentences represented as tensors.
+        - max_len: int: The maximum sequence length to
+        pad sentences.
+
+    Returns:
+        - fr_batch_padded: torch.Tensor: A tensor containing
+        padded French sentences.
+        - en_batch_padded: torch.Tensor: A tensor containing
+        padded English sentences.
+    """
     fr_batch_padded = [
         torch.cat(
             [
@@ -120,20 +174,6 @@ if os.path.exists("data/vocab_fr.pkl") and os.path.exists("data/vocab_en.pkl"):
 else:
     logging.info("Building vocab...")
 
-    def build_vocab(df):
-        def tokenize_pair(data):
-            for _, row in data.iterrows():
-                if isinstance(row["fr"], str) and isinstance(row["en"], str):
-                    yield tokenizer_fr(row["fr"])
-                    yield tokenizer_en(row["en"])
-
-        vocab = build_vocab_from_iterator(
-            tokenize_pair(df),
-            specials=["<unk>", "<pad>", "<bos>", "<eos>"],
-        )
-        vocab.set_default_index(vocab["<unk>"])
-        return vocab
-
     vocab_fr = build_vocab(df)
     vocab_en = build_vocab(df)
 
@@ -145,7 +185,28 @@ else:
     logging.info("Vocab succesfully built !")
 
 
-def tokenize_sentence_pair(item, vocab_fr, vocab_en):
+def tokenize_sentence_pair(
+    item: pd.Series,
+    vocab_fr: torchtext.vocab.Vocab,
+    vocab_en: torchtext.vocab.Vocab,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Tokenizes and converts sentence pairs into tensors of vocabulary indices.
+
+    Arguments:
+        - item: pd.Series: A row from the dataset containing
+        French and English sentences.
+        - vocab_fr: Vocab: The vocabulary object for the
+        French language.
+        - vocab_en: Vocab: The vocabulary object for the
+        English language.
+
+    Returns:
+        - fr_tokens: torch.Tensor: A tensor of vocabulary indices
+        for the French sentence.
+        - en_tokens: torch.Tensor: A tensor of vocabulary indices
+        for the English sentence.
+    """
     fr_tokens = (
         [vocab_fr["<bos>"]]
         + [vocab_fr[token] for token in tokenizer_fr(item["fr"])]
@@ -159,7 +220,26 @@ def tokenize_sentence_pair(item, vocab_fr, vocab_en):
     return torch.tensor(fr_tokens), torch.tensor(en_tokens)
 
 
-def preprocess_data(df, vocab_fr, vocab_en):
+def preprocess_data(
+    df: pd.DataFrame,
+    vocab_fr: torchtext.vocab.Vocab,
+    vocab_en: torchtext.vocab.Vocab,
+) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+    """
+    Tokenizes and processes a dataset of sentence pairs into tensor pairs.
+
+    Arguments:
+        - df: pd.DataFrame: The dataset containing French
+        and English sentences.
+        - vocab_fr: Vocab: The vocabulary object for the
+        French language.
+        - vocab_en: Vocab: The vocabulary object for the
+        English language.
+
+    Returns:
+        - tokenized_data: List[Tuple[torch.Tensor, torch.Tensor]]: A
+        list of tokenized sentence pairs as tensors.
+    """
     tokenized_data = []
     for _, item in df.iterrows():
         if isinstance(item["fr"], str) and isinstance(item["en"], str):
@@ -196,12 +276,29 @@ valid_loader = DataLoader(
 class TransformerWithProjection(nn.Module):
     def __init__(
         self,
-        embedding_dim,
-        num_heads,
-        vocab_size_en,
-        max_len,
+        embedding_dim: int,
+        num_heads: int,
+        vocab_size_en: int,
+        max_len: int,
         learnable_encoding: bool = False,
-    ):
+    ) -> None:
+        """
+        Initializes the Transformer model with embedding, encoder, decoder,
+        and projection layers.
+
+        Arguments:
+            - embedding_dim: int: The size of the embedding
+            vectors.
+            - num_heads: int: The number of attention heads.
+            - vocab_size_en: int: The vocabulary size for the
+            target language.
+            - max_len: int: The maximum length of input sequences.
+            - learnable_encoding: bool: Whether to use learnable
+            positional encoding.
+        Returns:
+            -None
+        """
+
         super(TransformerWithProjection, self).__init__()
         self.embedder = Embedding(embedding_dim=embedding_dim)
         self.encoder = TransformerEncoderLayer(
@@ -223,7 +320,29 @@ class TransformerWithProjection(nn.Module):
                 max_len=max_len, embedding_dim=embedding_dim
             )
 
-    def forward(self, src, tgt, tgt_mask=None, memory_mask=None):
+    def forward(
+        self,
+        src: torch.Tensor,
+        tgt: torch.Tensor,
+        tgt_mask: Optional[torch.Tensor] = None,
+        memory_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Processes the input and target sequences through the Transformer model.
+
+        Arguments:
+            - src: torch.Tensor: The input sequence tensor.
+            - tgt: torch.Tensor: The target sequence tensor.
+            - tgt_mask: Optional[torch.Tensor]: The mask for the
+            target sequence.
+            - memory_mask: Optional[torch.Tensor]: The mask for the
+            encoder's memory.
+
+        Returns:
+            - projected_output: torch.Tensor: The output tensor
+            projected to the target vocabulary size.
+        """
+
         src_emb = self.embedder.embed(src)
         tgt_emb = self.embedder.embed(tgt)
         src = self.positionnal_encoding.add_positional_encoding(src_emb)
