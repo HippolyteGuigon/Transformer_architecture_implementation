@@ -6,7 +6,7 @@ The goal of this repository is to create an implementation of the Transformer Ar
 
 So far, the transformer architecture has been coded and is ready to be used !
 
-For the next steps, latest updates about transformers such as [Differential Transformer (2024)](https://arxiv.org/abs/2410.05258) could be added (first elements of code can be found in the features/differential_transformer implementation branch). Also, other elements such as more loss functions and activation functions will be coded
+For the next steps, latest updates about transformers such as [Differential Transformer (2024)](https://arxiv.org/abs/2410.05258) could be added (first elements of code can be found in the ```features/differential_transformer```  implementation branch). Also, other elements such as more loss functions and activation functions will be coded
 
 Throughout the project, if you see any improvements that could be made in the code, do not hesitate to reach out at
 Hippolyte.guigon@hec.edu. I will be delighted to get some insights !
