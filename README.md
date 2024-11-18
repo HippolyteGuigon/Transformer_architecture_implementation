@@ -41,4 +41,4 @@ As a guideline for using this Transformer architecture, we'll use a French-Engli
 
 * Launch the following command ```python transformer_architecture/traduction_test/traduction_pipeline.py``` and wait for the training to complete
 
-* Your final model is available at the following path ```models/checkpoint_last_epoch.pth```
+* Your final model is available at the following path ```models/checkpoint_last_epoch.pth```. At the end of the script ran above, the function ```translate_sentence``` is used as an example to translate a basic french sentence, but you're free to import it somewhere else and use it as a translator !
