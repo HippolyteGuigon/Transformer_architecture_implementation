@@ -136,33 +136,33 @@ def pad_sentences(
         pad sentences.
 
     Returns:
-        - fr_batch_padded: torch.Tensor: A tensor containing
-        padded French sentences.
-        - en_batch_padded: torch.Tensor: A tensor containing
-        padded English sentences.
+        - Tuple[torch.Tensor, torch.Tensor]: A tuple containing
+        padded French and English sentences as tensors.
     """
     fr_batch_padded = [
         torch.cat(
             [
-                sentence,
+                sentence[:max_len],  # Truncate if longer than max_len
                 torch.full((max_len - len(sentence),), vocab_fr["<pad>"]),
             ]
         )
         if len(sentence) < max_len
-        else sentence
+        else sentence[:max_len]
         for sentence in fr_batch
     ]
+
     en_batch_padded = [
         torch.cat(
             [
-                sentence,
+                sentence[:max_len],  # Truncate if longer than max_len
                 torch.full((max_len - len(sentence),), vocab_en["<pad>"]),
             ]
         )
         if len(sentence) < max_len
-        else sentence
+        else sentence[:max_len]
         for sentence in en_batch
     ]
+
     return torch.stack(fr_batch_padded), torch.stack(en_batch_padded)
 
 
@@ -357,6 +357,101 @@ class TransformerWithProjection(nn.Module):
         return self.projection(decoder_output)
 
 
+def translate_sentence(
+    sentence: str,
+    model: TransformerWithProjection,
+    vocab_fr: torchtext.vocab.Vocab,
+    vocab_en: torchtext.vocab.Vocab,
+    tokenizer_fr: torchtext.data.utils,
+    max_len: int,
+    device: str = "cpu",
+) -> str:
+    """
+    Translates a French sentence into English using the
+    trained Transformer model.
+
+    Arguments:
+        - sentence: str: The French sentence to translate.
+        - model: TransformerWithProjection: The trained Transformer model.
+        - vocab_fr: Vocab: The vocabulary object for French.
+        - vocab_en: Vocab: The vocabulary object for English.
+        - tokenizer_fr: Tokenizer: The tokenizer for French.
+        - max_len: int: The maximum length of input sequences.
+        - device: str: The device to use for computation ('cpu' or 'cuda').
+
+    Returns:
+        - translated_sentence: str: The translated English sentence.
+    """
+    # Tokenize and encode the French sentence
+    tokens = (
+        [vocab_fr["<bos>"]]
+        + [vocab_fr[token] for token in tokenizer_fr(sentence)]
+        + [vocab_fr["<eos>"]]
+    )
+    input_tensor = torch.tensor(
+        tokens, dtype=torch.long, device=device
+    ).unsqueeze(0)
+
+    # Ensure input_tensor matches max_len
+    if input_tensor.size(1) < max_len:
+        padding = torch.full(
+            (1, max_len - input_tensor.size(1)),
+            vocab_fr["<pad>"],
+            device=device,
+            dtype=torch.long,
+        )
+        input_tensor = torch.cat([input_tensor, padding], dim=1)
+    elif input_tensor.size(1) > max_len:
+        input_tensor = input_tensor[:, :max_len]
+
+    # Prepare the target tensor with just the <bos> token
+    target_tensor = torch.tensor(
+        [vocab_en["<bos>"]], dtype=torch.long, device=device
+    ).unsqueeze(0)
+
+    model.eval()
+    with torch.no_grad():
+        for _ in range(max_len):
+            # Add positional encoding to input tensor
+            src_emb = model.positionnal_encoding.add_positional_encoding(
+                model.embedder.embed(input_tensor)
+            )
+
+            # Add positional encoding to target tensor dynamically
+            tgt_emb = model.embedder.embed(target_tensor)
+            tgt_emb = tgt_emb + model.positionnal_encoding.pe[
+                : tgt_emb.size(1), :
+            ].unsqueeze(0)
+
+            # Pass through the Transformer model
+            encoder_output = model.encoder(src_emb)
+            decoder_output = model.decoder(tgt=tgt_emb, memory=encoder_output)
+            output_logits = model.projection(decoder_output)
+
+            # Get the next token prediction
+            next_token = output_logits[:, -1, :].argmax(dim=-1).item()
+
+            # Append the predicted token to the target sequence
+            target_tensor = torch.cat(
+                [target_tensor, torch.tensor([[next_token]], device=device)],
+                dim=1,
+            )
+
+            # Stop if <eos> token is generated
+            if next_token == vocab_en["<eos>"]:
+                break
+
+    # Decode the tokens into a sentence
+    translated_tokens = target_tensor.squeeze().tolist()
+    translated_sentence = " ".join(
+        vocab_en.lookup_token(idx)
+        for idx in translated_tokens
+        if idx not in [vocab_en["<bos>"], vocab_en["<eos>"], vocab_en["<pad>"]]
+    )
+
+    return translated_sentence
+
+
 embedding_dim = embedding_dim
 num_heads = num_heads
 vocab_size_fr = len(vocab_fr)
@@ -509,5 +604,26 @@ for epoch in range(num_epochs):
         "models/checkpoint_last_epoch.pth",
     )
 
+os.makedirs("metrics", exist_ok=True)
 with open("metrics/metrics_epochs.json", "w") as f:
     json.dump(overall_metrics, f)
+
+
+# Example of model utilisation
+checkpoint = torch.load("models/checkpoint_last_epoch.pth", map_location="cpu")
+model.load_state_dict(checkpoint["model_state_dict"])
+model.eval()
+
+french_sentence = "Bonjour, comment allez-vous ?"
+translated_sentence = translate_sentence(
+    sentence=french_sentence,
+    model=model,
+    vocab_fr=vocab_fr,
+    vocab_en=vocab_en,
+    tokenizer_fr=tokenizer_fr,
+    max_len=max_len,
+    device="cpu",
+)
+
+print("French:", french_sentence)
+print("English:", translated_sentence)
