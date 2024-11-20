@@ -254,13 +254,28 @@ def preprocess_data(
     return tokenized_data
 
 
-logging.info("Preprocessing dataset...")
-data_sample = preprocess_data(df, vocab_fr, vocab_en)
-train_size = int(train_size * len(data_sample))
-valid_size = len(data_sample) - train_size
-train_data_sample, valid_data_sample = random_split(
-    data_sample, [train_size, valid_size]
-)
+if not os.path.exists("data/train_data_sample.pkl"):
+    logging.info("Preprocessing dataset...")
+    data_sample = preprocess_data(df, vocab_fr, vocab_en)
+    train_size = int(train_size * len(data_sample))
+    valid_size = len(data_sample) - train_size
+    train_data_sample, valid_data_sample = random_split(
+        data_sample, [train_size, valid_size]
+    )
+
+    with open("data/train_data_sample.pkl", "wb") as f:
+        pickle.dump(train_data_sample, f)
+
+    with open("data/valid_data_sample.pkl", "wb") as f:
+        pickle.dump(valid_data_sample, f)
+    del data_sample
+
+else:
+    with open("data/train_data_sample.pkl", "rb") as f:
+        train_data_sample = pickle.open(f)
+    with open("data/valid_data_sample.pkl", "rb") as f:
+        valid_data_sample = pickle.open(f)
+
 
 del df
 gc.collect()
