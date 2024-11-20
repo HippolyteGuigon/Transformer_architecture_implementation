@@ -272,9 +272,9 @@ if not os.path.exists("data/train_data_sample.pkl"):
 
 else:
     with open("data/train_data_sample.pkl", "rb") as f:
-        train_data_sample = pickle.open(f)
+        train_data_sample = pickle.load(f)
     with open("data/valid_data_sample.pkl", "rb") as f:
-        valid_data_sample = pickle.open(f)
+        valid_data_sample = pickle.load(f)
 
 
 del df
