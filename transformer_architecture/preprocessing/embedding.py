@@ -10,6 +10,8 @@ from typing import List, Dict
 
 warnings.filterwarnings("ignore")
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class DataPreprocessor:
     """
@@ -286,7 +288,11 @@ class SinusoidalPositionalEncoding(PositionalEncoding):
             transformed with positional encoding
         """
 
+        self.pe = self.pe.to(device=device)
+
         encoded_data = data + self.pe
+
+        encoded_data = encoded_data.to(device=device)
 
         return encoded_data
 
@@ -346,6 +352,10 @@ class LearnablePositionnalEncoding(PositionalEncoding):
             transformed with positional encoding
         """
 
+        self.pe = self.pe.to(device=device)
+
         encoded_data = data + self.pe
+
+        encoded_data = encoded_data.to(device=device)
 
         return encoded_data

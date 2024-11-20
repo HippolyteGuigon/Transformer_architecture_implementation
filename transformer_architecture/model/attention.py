@@ -10,6 +10,8 @@ from transformer_architecture.preprocessing.embedding import (
     RotaryPositionnalEmbedding,
 )
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class Attention(ABC, nn.Module):
     """
@@ -94,6 +96,9 @@ class SelfAttention(Attention):
         """
 
         dot_product = torch.matmul(query, key.transpose(-2, -1))
+
+        dot_product = dot_product.to(device=device)
+
         scaled_dot_product = dot_product / math.sqrt(self.d_k)
 
         if masking:
@@ -101,6 +106,7 @@ class SelfAttention(Attention):
             mask = torch.triu(
                 torch.ones(mask_size, mask_size), diagonal=1
             ).bool()
+            mask = mask.to(device=device)
             if not torch.is_floating_point(scaled_dot_product):
                 scaled_dot_product = scaled_dot_product.to(torch.float32)
 
@@ -108,6 +114,7 @@ class SelfAttention(Attention):
 
         attention_scores = softmax(scaled_dot_product, axis=-1)
         attention_scores = torch.matmul(attention_scores, value)
+        attention_scores = attention_scores.to(device=device)
 
         return attention_scores
 

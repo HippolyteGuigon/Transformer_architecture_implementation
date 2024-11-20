@@ -25,6 +25,7 @@ from transformer_architecture.preprocessing.embedding import (
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 main_params = load_conf(include=True)
 main_params = clean_params(main_params)
@@ -164,7 +165,9 @@ def pad_sentences(
         for sentence in en_batch
     ]
 
-    return torch.stack(fr_batch_padded), torch.stack(en_batch_padded)
+    return torch.stack(fr_batch_padded).to(device), torch.stack(
+        en_batch_padded
+    ).to(device)
 
 
 if os.path.exists("data/vocab_fr.pkl") and os.path.exists("data/vocab_en.pkl"):
@@ -305,14 +308,14 @@ class TransformerWithProjection(nn.Module):
         """
 
         super(TransformerWithProjection, self).__init__()
-        self.embedder = Embedding(embedding_dim=embedding_dim)
+        self.embedder = Embedding(embedding_dim=embedding_dim).to(device)
         self.encoder = TransformerEncoderLayer(
             d_model=embedding_dim, num_heads=num_heads, norm_first=True
-        )
+        ).to(device)
         self.decoder = TransformerDecoderLayer(
             d_model=embedding_dim, num_heads=num_heads, norm_first=True
-        )
-        self.projection = nn.Linear(embedding_dim, vocab_size_en)
+        ).to(device)
+        self.projection = nn.Linear(embedding_dim, vocab_size_en).to(device)
         self.parameters_to_optimize = list(self.parameters())
 
         if learnable_encoding:
@@ -418,11 +421,13 @@ def translate_sentence(
     with torch.no_grad():
         for _ in range(max_len):
             # Add positional encoding to input tensor
+            input_tensor = input_tensor.to(device=device)
             src_emb = model.positionnal_encoding.add_positional_encoding(
                 model.embedder.embed(input_tensor)
             )
 
             # Add positional encoding to target tensor dynamically
+            target_tensor = target_tensor.to(device=device)
             tgt_emb = model.embedder.embed(target_tensor)
             tgt_emb = tgt_emb + model.positionnal_encoding.pe[
                 : tgt_emb.size(1), :
@@ -468,7 +473,7 @@ model = TransformerWithProjection(
     vocab_size_en=vocab_size_en,
     max_len=max_len,
     learnable_encoding=True,
-)
+).to(device)
 
 optimizer = optim.Adam(model.parameters_to_optimize, lr=learning_rate)
 
