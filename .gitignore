@@ -14,6 +14,7 @@ french-english-traduction-auth.json
 #Except these files
 
 !requirements.txt
+!kaggle.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
