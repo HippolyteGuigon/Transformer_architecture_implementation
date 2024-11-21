@@ -496,6 +496,8 @@ criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
 
 scorer_rouge = rouge_scorer.RougeScorer(["rouge1", "rougeL"], use_stemmer=True)
 
+scaler = torch.cuda.amp.GradScaler()
+
 logging.info("Model training has begun")
 
 overall_metrics = {}
@@ -505,6 +507,9 @@ for epoch in range(num_epochs):
     total_loss = 0
 
     for fr_batch, en_batch in train_loader:
+        torch.cuda.empty_cache()
+        gc.collect()
+
         optimizer.zero_grad()
         tgt_mask = torch.triu(
             torch.ones(en_batch.size(1), en_batch.size(1))
@@ -513,18 +518,22 @@ for epoch in range(num_epochs):
             (fr_batch == vocab_fr["<pad>"]).transpose(0, 1).to(fr_batch.device)
         )
 
-        output = model(
-            src=fr_batch,
-            tgt=en_batch,
-            tgt_mask=tgt_mask,
-            memory_mask=memory_mask,
-        )
-        output = output.view(-1, vocab_size_en)
-        loss = criterion(output, en_batch.view(-1))
-        logging.info(f"Training Loss: {loss:.4f}")
-        loss.backward()
+        with torch.cuda.amp.autocast():
+            output = model(
+                src=fr_batch,
+                tgt=en_batch,
+                tgt_mask=tgt_mask,
+                memory_mask=memory_mask,
+            )
+            output = output.view(-1, vocab_size_en)
+            loss = criterion(output, en_batch.view(-1))
 
-        optimizer.step()
+        logging.info(f"Training Loss: {loss:.4f}")
+
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
         total_loss += loss.item()
 
     avg_train_loss = total_loss / len(train_loader)
