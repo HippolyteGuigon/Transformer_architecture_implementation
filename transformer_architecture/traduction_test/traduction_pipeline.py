@@ -22,11 +22,16 @@ from transformer_architecture.preprocessing.embedding import (
     SinusoidalPositionalEncoding,
     LearnablePositionnalEncoding,
 )
+from torch.utils.data.dataset import Subset
+from torch.utils.checkpoint import checkpoint
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+os.environ[
+    "PYTORCH_CUDA_ALLOC_CONF"
+] = "garbage_collection_threshold:0.6,max_split_size_mb:32"
 main_params = load_conf(include=True)
 main_params = clean_params(main_params)
 
@@ -67,6 +72,7 @@ subprocess.run(
     stderr=subprocess.DEVNULL,
 )
 
+max_len = 100
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
@@ -74,6 +80,24 @@ logging.info("Loading dataset...")
 df = pd.read_csv("data/en-fr.csv", nrows=nrows)
 df.dropna(subset=["en", "fr"], inplace=True)
 logging.info(f"Dataset loaded with {df.shape[0]}!")
+logging.info("Filtering dataset...")
+df["sentence_length"] = df["fr"].apply(lambda x: len(x.split(" ")))
+df = df[df["sentence_length"] < max_len]
+df.drop("sentence_length", axis=1, inplace=True)
+logging.info(f"Succesfully filtered ! New shape of {df.shape[0]}")
+
+
+def print_memory_stats(stage):
+    allocated = torch.cuda.memory_allocated() / 1e9  # Convertir en GB
+    reserved = torch.cuda.memory_reserved() / 1e9  # Convertir en GB
+    free = torch.cuda.get_device_properties(0).total_memory / 1e9 - reserved
+    print(
+        f"[{stage}] GPU Memory - Allocated: {allocated:.2f} GB,\
+              Reserved: {reserved:.2f} GB, Free: {free:.2f} GB"
+    )
+
+
+print_memory_stats(1)
 
 
 def get_corpus_max_len(
@@ -124,7 +148,9 @@ def build_vocab(df: pd.DataFrame) -> torchtext.vocab.Vocab:
 
 
 def pad_sentences(
-    fr_batch: List[torch.Tensor], en_batch: List[torch.Tensor], max_len: int
+    fr_batch: List[torch.Tensor],
+    en_batch: List[torch.Tensor],
+    max_len: int = 100,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Pads sentences in French and English batches to the same maximum length.
@@ -170,6 +196,8 @@ def pad_sentences(
     ).to(device)
 
 
+print_memory_stats(2)
+
 if os.path.exists("data/vocab_fr.pkl") and os.path.exists("data/vocab_en.pkl"):
     with open("data/vocab_fr.pkl", "rb") as f:
         vocab_fr = pickle.load(f)
@@ -187,6 +215,8 @@ else:
         pickle.dump(vocab_en, f)
 
     logging.info("Vocab succesfully built !")
+
+print_memory_stats(3)
 
 
 def tokenize_sentence_pair(
@@ -276,24 +306,16 @@ else:
     with open("data/valid_data_sample.pkl", "rb") as f:
         valid_data_sample = pickle.load(f)
 
+print_memory_stats(4)
 
 del df
 gc.collect()
 
+print_memory_stats(5)
+
 logging.info("Dataset preprocessing is over")
 
 max_len = get_corpus_max_len(train_data_sample)
-
-train_loader = DataLoader(
-    train_data_sample,
-    batch_size=batch_size,
-    collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
-)
-valid_loader = DataLoader(
-    valid_data_sample,
-    batch_size=batch_size,
-    collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
-)
 
 
 class TransformerWithProjection(nn.Module):
@@ -302,7 +324,7 @@ class TransformerWithProjection(nn.Module):
         embedding_dim: int,
         num_heads: int,
         vocab_size_en: int,
-        max_len: int,
+        max_len: int = 100,
         learnable_encoding: bool = False,
     ) -> None:
         """
@@ -323,24 +345,29 @@ class TransformerWithProjection(nn.Module):
         """
 
         super(TransformerWithProjection, self).__init__()
+
         self.embedder = Embedding(embedding_dim=embedding_dim).to(device)
+        print_memory_stats("After embedding")
         self.encoder = TransformerEncoderLayer(
             d_model=embedding_dim, num_heads=num_heads, norm_first=True
         ).to(device)
+
         self.decoder = TransformerDecoderLayer(
             d_model=embedding_dim, num_heads=num_heads, norm_first=True
         ).to(device)
         self.projection = nn.Linear(embedding_dim, vocab_size_en).to(device)
+        print_memory_stats("After projection")
         self.parameters_to_optimize = list(self.parameters())
+        print_memory_stats("After parameters to optimize")
 
         if learnable_encoding:
             self.positionnal_encoding = LearnablePositionnalEncoding(
-                max_len=max_len, embedding_dim=embedding_dim
+                max_len=100, embedding_dim=embedding_dim
             )
             self.parameters_to_optimize += [self.positionnal_encoding.pe]
         else:
             self.positionnal_encoding = SinusoidalPositionalEncoding(
-                max_len=max_len, embedding_dim=embedding_dim
+                max_len=100, embedding_dim=embedding_dim
             )
 
     def forward(
@@ -366,17 +393,28 @@ class TransformerWithProjection(nn.Module):
             projected to the target vocabulary size.
         """
 
+        print("SRC_SIZE", src.size())
         src_emb = self.embedder.embed(src)
+        print_memory_stats("After src_embedding")
         tgt_emb = self.embedder.embed(tgt)
+        print_memory_stats("After target embedding")
         src = self.positionnal_encoding.add_positional_encoding(src_emb)
+        print_memory_stats("After src")
         tgt = self.positionnal_encoding.add_positional_encoding(tgt_emb)
+        print("ICIIIIIIII", tgt.size())
+        print_memory_stats("After tgt")
         encoder_output = self.encoder(src=src)
+        del src_emb, tgt_emb, src
+        torch.cuda.empty_cache()
+        gc.collect()
+        print_memory_stats("After encoder_output")
         decoder_output = self.decoder(
             tgt=tgt,
             memory=encoder_output,
             tgt_mask=tgt_mask,
             memory_mask=memory_mask,
         )
+        print_memory_stats("After decoder output")
         return self.projection(decoder_output)
 
 
@@ -482,12 +520,14 @@ num_heads = num_heads
 vocab_size_fr = len(vocab_fr)
 vocab_size_en = len(vocab_en)
 
+print_memory_stats(6)
+
 model = TransformerWithProjection(
     embedding_dim=embedding_dim,
     num_heads=num_heads,
     vocab_size_en=vocab_size_en,
-    max_len=max_len,
-    learnable_encoding=True,
+    max_len=100,
+    learnable_encoding=False,
 ).to(device)
 
 optimizer = optim.Adam(model.parameters_to_optimize, lr=learning_rate)
@@ -502,52 +542,57 @@ logging.info("Model training has begun")
 
 overall_metrics = {}
 
-for epoch in range(num_epochs):
-    model.train()
-    total_loss = 0
+print_memory_stats(7)
 
-    for fr_batch, en_batch in train_loader:
-        torch.cuda.empty_cache()
-        gc.collect()
+# train_loader = DataLoader(
+#    train_data_sample,
+#    batch_size=batch_size,
+#    collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
+# )
 
-        optimizer.zero_grad()
-        tgt_mask = torch.triu(
-            torch.ones(en_batch.size(1), en_batch.size(1))
-        ).to(fr_batch.device)
-        memory_mask = (
-            (fr_batch == vocab_fr["<pad>"]).transpose(0, 1).to(fr_batch.device)
-        )
+valid_loader = DataLoader(
+    valid_data_sample,
+    batch_size=batch_size,
+    collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=100),
+)
 
-        with torch.cuda.amp.autocast():
-            output = model(
-                src=fr_batch,
-                tgt=en_batch,
-                tgt_mask=tgt_mask,
-                memory_mask=memory_mask,
-            )
-            output = output.view(-1, vocab_size_en)
-            loss = criterion(output, en_batch.view(-1))
+print_memory_stats(8)
 
-        logging.info(f"Training Loss: {loss:.4f}")
+indices = train_data_sample.indices
+chunk_size = 150
 
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+for i in range(0, len(indices), chunk_size):
+    print_memory_stats(9)
 
-        total_loss += loss.item()
+    chunk_indices = indices[i : i + chunk_size]
+    chunk_subset = Subset(train_data_sample.dataset, chunk_indices)
+    train_loader = DataLoader(
+        chunk_subset,
+        batch_size=batch_size,
+        collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=100),
+    )
 
-    avg_train_loss = total_loss / len(train_loader)
-    logging.warning(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
+    print_memory_stats(10)
 
-    model.eval()
-    val_loss = 0
-    total_bleu = 0
-    total_rouge_1 = 0
-    total_rouge_l = 0
-    num_samples = 0
+    del chunk_subset
+    gc.collect()
 
-    with torch.no_grad():
-        for fr_batch, en_batch in valid_loader:
+    print_memory_stats(11)
+
+    for epoch in range(num_epochs):
+        model.train()
+        total_loss = 0
+
+        for fr_batch, en_batch in train_loader:
+            print("fr_batch_size", fr_batch.size())
+            print("en_batch_size", en_batch.size())
+            print_memory_stats(12)
+
+            torch.cuda.empty_cache()
+            gc.collect()
+            print_memory_stats(13)
+
+            optimizer.zero_grad()
             tgt_mask = torch.triu(
                 torch.ones(en_batch.size(1), en_batch.size(1))
             ).to(fr_batch.device)
@@ -557,86 +602,146 @@ for epoch in range(num_epochs):
                 .to(fr_batch.device)
             )
 
+            print_memory_stats(14)
+
             output = model(
                 src=fr_batch,
                 tgt=en_batch,
                 tgt_mask=tgt_mask,
                 memory_mask=memory_mask,
             )
+            print_memory_stats(15)
+
             output = output.view(-1, vocab_size_en)
             loss = criterion(output, en_batch.view(-1))
-            val_loss += loss.item()
 
-            output_tokens = (
-                output.argmax(dim=-1).view(en_batch.size()).tolist()
-            )
-            target_tokens = en_batch.tolist()
+            logging.info(f"Training Loss: {loss:.4f}")
+            print_memory_stats(16)
 
-            for output_seq, target_seq in zip(output_tokens, target_tokens):
-                output_seq = [
-                    vocab_en.lookup_token(idx)
-                    for idx in output_seq
-                    if idx
-                    not in [
-                        vocab_en["<bos>"],
-                        vocab_en["<eos>"],
-                        vocab_en["<pad>"],
-                    ]
-                ]
-                target_seq = [
-                    vocab_en.lookup_token(idx)
-                    for idx in target_seq
-                    if idx
-                    not in [
-                        vocab_en["<bos>"],
-                        vocab_en["<eos>"],
-                        vocab_en["<pad>"],
-                    ]
-                ]
+            loss.backward()
+            optimizer.step()
 
-                bleu_score = sentence_bleu([target_seq], output_seq)
-                total_bleu += bleu_score
+            total_loss += loss.item()
 
-                rouge_scores = scorer_rouge.score(
-                    " ".join(target_seq), " ".join(output_seq)
+        avg_train_loss = total_loss / len(train_loader)
+        logging.warning(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
+
+        model.eval()
+        val_loss = 0
+        total_bleu = 0
+        total_rouge_1 = 0
+        total_rouge_l = 0
+        num_samples = 0
+
+        with torch.no_grad():
+            for fr_batch, en_batch in valid_loader:
+                batch_max_len = max(len(seq) for seq in fr_batch)
+                fr_batch = [seq[:batch_max_len] for seq in fr_batch]
+                en_batch = [seq[:batch_max_len] for seq in en_batch]
+
+                tgt_mask = (
+                    torch.triu(torch.ones(en_batch.size(1), en_batch.size(1)))
+                    .bool()
+                    .to(fr_batch.device)
                 )
-                total_rouge_1 += rouge_scores["rouge1"].fmeasure
-                total_rouge_l += rouge_scores["rougeL"].fmeasure
+                memory_mask = (
+                    (fr_batch == vocab_fr["<pad>"])
+                    .transpose(0, 1)
+                    .bool()
+                    .to(fr_batch.device)
+                )
 
-                num_samples += 1
+                output = checkpoint(
+                    model.forward,
+                    src=fr_batch,
+                    tgt=en_batch,
+                    tgt_mask=tgt_mask,
+                    memory_mask=memory_mask,
+                )
 
-    avg_val_loss = val_loss / len(valid_loader)
-    avg_bleu = total_bleu / num_samples
-    avg_rouge_1 = total_rouge_1 / num_samples
-    avg_rouge_l = total_rouge_l / num_samples
+                output = output.view(-1, vocab_size_en)
+                loss = criterion(output, en_batch.view(-1))
+                val_loss += loss.item()
 
-    metrics = {
-        "epoch": epoch,
-        "train_loss": avg_train_loss,
-        "val_loss": avg_val_loss,
-        "bleu_score": avg_bleu,
-        "rouge1_score": avg_rouge_1,
-        "rougeL_score": avg_rouge_l,
-    }
+                output_tokens = (
+                    output.argmax(dim=-1).view(en_batch.size()).tolist()
+                )
+                target_tokens = en_batch.tolist()
 
-    epoch_key = f"epoch_{epoch}"
-    overall_metrics[epoch_key] = metrics
+                for output_seq, target_seq in zip(
+                    output_tokens, target_tokens
+                ):
+                    output_seq = [
+                        vocab_en.lookup_token(idx)
+                        for idx in output_seq
+                        if idx
+                        not in [
+                            vocab_en["<bos>"],
+                            vocab_en["<eos>"],
+                            vocab_en["<pad>"],
+                        ]
+                    ]
+                    target_seq = [
+                        vocab_en.lookup_token(idx)
+                        for idx in target_seq
+                        if idx
+                        not in [
+                            vocab_en["<bos>"],
+                            vocab_en["<eos>"],
+                            vocab_en["<pad>"],
+                        ]
+                    ]
 
-    logging.warning(f"Epoch {epoch}, Validation Loss: {avg_val_loss}")
-    logging.warning(f"Epoch {epoch}, Validation BLEU Score: {avg_bleu}")
-    logging.warning(f"Epoch {epoch}, Validation ROUGE-1 Score: {avg_rouge_1}")
-    logging.warning(f"Epoch {epoch}, Validation ROUGE-L Score: {avg_rouge_l}")
+                    bleu_score = sentence_bleu([target_seq], output_seq)
+                    total_bleu += bleu_score
 
-    torch.save(
-        {
+                    rouge_scores = scorer_rouge.score(
+                        " ".join(target_seq), " ".join(output_seq)
+                    )
+                    total_rouge_1 += rouge_scores["rouge1"].fmeasure
+                    total_rouge_l += rouge_scores["rougeL"].fmeasure
+
+                    num_samples += 1
+
+        avg_val_loss = val_loss / len(valid_loader)
+        avg_bleu = total_bleu / num_samples
+        avg_rouge_1 = total_rouge_1 / num_samples
+        avg_rouge_l = total_rouge_l / num_samples
+
+        metrics = {
             "epoch": epoch,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
             "train_loss": avg_train_loss,
             "val_loss": avg_val_loss,
-        },
-        "models/checkpoint_last_epoch.pth",
-    )
+            "bleu_score": avg_bleu,
+            "rouge1_score": avg_rouge_1,
+            "rougeL_score": avg_rouge_l,
+        }
+
+        epoch_key = f"epoch_{epoch}"
+        overall_metrics[epoch_key] = metrics
+
+        logging.warning(f"Epoch {epoch}, Validation Loss: {avg_val_loss}")
+        logging.warning(f"Epoch {epoch}, Validation BLEU Score: {avg_bleu}")
+        logging.warning(
+            f"Epoch {epoch}, Validation ROUGE-1 Score: {avg_rouge_1}"
+        )
+        logging.warning(
+            f"Epoch {epoch}, Validation ROUGE-L Score: {avg_rouge_l}"
+        )
+
+        torch.save(
+            {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "train_loss": avg_train_loss,
+                "val_loss": avg_val_loss,
+            },
+            "models/checkpoint_last_epoch.pth",
+        )
+
+        del train_loader
+        gc.collect()
 
 os.makedirs("metrics", exist_ok=True)
 with open("metrics/metrics_epochs.json", "w") as f:
