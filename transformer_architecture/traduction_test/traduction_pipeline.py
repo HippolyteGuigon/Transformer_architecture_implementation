@@ -42,6 +42,7 @@ num_heads = main_params["num_heads"]
 batch_size = main_params["batch_size"]
 train_size = main_params["train_size"]
 nrows = main_params["nrows"]
+max_len = main_params["max_len"]
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -72,7 +73,6 @@ subprocess.run(
     stderr=subprocess.DEVNULL,
 )
 
-max_len = 100
 tokenizer_fr = get_tokenizer("spacy", language="fr_core_news_sm")
 tokenizer_en = get_tokenizer("spacy", language="en_core_web_sm")
 
@@ -92,12 +92,9 @@ def print_memory_stats(stage):
     reserved = torch.cuda.memory_reserved() / 1e9  # Convertir en GB
     free = torch.cuda.get_device_properties(0).total_memory / 1e9 - reserved
     print(
-        f"[{stage}] GPU Memory - Allocated: {allocated:.2f} GB,\
-              Reserved: {reserved:.2f} GB, Free: {free:.2f} GB"
+        f"[{stage}] GPU Memory - Allocated: {allocated:.2f}\
+              GB, Reserved: {reserved:.2f} GB, Free: {free:.2f} GB"
     )
-
-
-print_memory_stats(1)
 
 
 def get_corpus_max_len(
@@ -150,7 +147,7 @@ def build_vocab(df: pd.DataFrame) -> torchtext.vocab.Vocab:
 def pad_sentences(
     fr_batch: List[torch.Tensor],
     en_batch: List[torch.Tensor],
-    max_len: int = 100,
+    max_len: int = max_len,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Pads sentences in French and English batches to the same maximum length.
@@ -196,8 +193,6 @@ def pad_sentences(
     ).to(device)
 
 
-print_memory_stats(2)
-
 if os.path.exists("data/vocab_fr.pkl") and os.path.exists("data/vocab_en.pkl"):
     with open("data/vocab_fr.pkl", "rb") as f:
         vocab_fr = pickle.load(f)
@@ -215,8 +210,6 @@ else:
         pickle.dump(vocab_en, f)
 
     logging.info("Vocab succesfully built !")
-
-print_memory_stats(3)
 
 
 def tokenize_sentence_pair(
@@ -306,12 +299,8 @@ else:
     with open("data/valid_data_sample.pkl", "rb") as f:
         valid_data_sample = pickle.load(f)
 
-print_memory_stats(4)
-
 del df
 gc.collect()
-
-print_memory_stats(5)
 
 logging.info("Dataset preprocessing is over")
 
@@ -324,7 +313,7 @@ class TransformerWithProjection(nn.Module):
         embedding_dim: int,
         num_heads: int,
         vocab_size_en: int,
-        max_len: int = 100,
+        max_len: int = max_len,
         learnable_encoding: bool = False,
     ) -> None:
         """
@@ -347,7 +336,6 @@ class TransformerWithProjection(nn.Module):
         super(TransformerWithProjection, self).__init__()
 
         self.embedder = Embedding(embedding_dim=embedding_dim).to(device)
-        print_memory_stats("After embedding")
         self.encoder = TransformerEncoderLayer(
             d_model=embedding_dim, num_heads=num_heads, norm_first=True
         ).to(device)
@@ -356,18 +344,16 @@ class TransformerWithProjection(nn.Module):
             d_model=embedding_dim, num_heads=num_heads, norm_first=True
         ).to(device)
         self.projection = nn.Linear(embedding_dim, vocab_size_en).to(device)
-        print_memory_stats("After projection")
         self.parameters_to_optimize = list(self.parameters())
-        print_memory_stats("After parameters to optimize")
 
         if learnable_encoding:
             self.positionnal_encoding = LearnablePositionnalEncoding(
-                max_len=100, embedding_dim=embedding_dim
+                max_len=max_len, embedding_dim=embedding_dim
             )
             self.parameters_to_optimize += [self.positionnal_encoding.pe]
         else:
             self.positionnal_encoding = SinusoidalPositionalEncoding(
-                max_len=100, embedding_dim=embedding_dim
+                max_len=max_len, embedding_dim=embedding_dim
             )
 
     def forward(
@@ -393,28 +379,21 @@ class TransformerWithProjection(nn.Module):
             projected to the target vocabulary size.
         """
 
-        print("SRC_SIZE", src.size())
         src_emb = self.embedder.embed(src)
-        print_memory_stats("After src_embedding")
         tgt_emb = self.embedder.embed(tgt)
-        print_memory_stats("After target embedding")
         src = self.positionnal_encoding.add_positional_encoding(src_emb)
-        print_memory_stats("After src")
         tgt = self.positionnal_encoding.add_positional_encoding(tgt_emb)
-        print("ICIIIIIIII", tgt.size())
-        print_memory_stats("After tgt")
         encoder_output = self.encoder(src=src)
         del src_emb, tgt_emb, src
         torch.cuda.empty_cache()
         gc.collect()
-        print_memory_stats("After encoder_output")
         decoder_output = self.decoder(
             tgt=tgt,
             memory=encoder_output,
             tgt_mask=tgt_mask,
             memory_mask=memory_mask,
         )
-        print_memory_stats("After decoder output")
+
         return self.projection(decoder_output)
 
 
@@ -520,13 +499,11 @@ num_heads = num_heads
 vocab_size_fr = len(vocab_fr)
 vocab_size_en = len(vocab_en)
 
-print_memory_stats(6)
-
 model = TransformerWithProjection(
     embedding_dim=embedding_dim,
     num_heads=num_heads,
     vocab_size_en=vocab_size_en,
-    max_len=100,
+    max_len=max_len,
     learnable_encoding=False,
 ).to(device)
 
@@ -542,8 +519,6 @@ logging.info("Model training has begun")
 
 overall_metrics = {}
 
-print_memory_stats(7)
-
 # train_loader = DataLoader(
 #    train_data_sample,
 #    batch_size=batch_size,
@@ -553,44 +528,31 @@ print_memory_stats(7)
 valid_loader = DataLoader(
     valid_data_sample,
     batch_size=batch_size,
-    collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=100),
+    collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=max_len),
 )
 
-print_memory_stats(8)
-
 indices = train_data_sample.indices
-chunk_size = 150
+chunk_size = 50000
 
 for i in range(0, len(indices), chunk_size):
-    print_memory_stats(9)
-
     chunk_indices = indices[i : i + chunk_size]
     chunk_subset = Subset(train_data_sample.dataset, chunk_indices)
     train_loader = DataLoader(
         chunk_subset,
         batch_size=batch_size,
-        collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=100),
+        collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=20),
     )
-
-    print_memory_stats(10)
 
     del chunk_subset
     gc.collect()
-
-    print_memory_stats(11)
 
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
 
         for fr_batch, en_batch in train_loader:
-            print("fr_batch_size", fr_batch.size())
-            print("en_batch_size", en_batch.size())
-            print_memory_stats(12)
-
             torch.cuda.empty_cache()
             gc.collect()
-            print_memory_stats(13)
 
             optimizer.zero_grad()
             tgt_mask = torch.triu(
@@ -602,21 +564,17 @@ for i in range(0, len(indices), chunk_size):
                 .to(fr_batch.device)
             )
 
-            print_memory_stats(14)
-
             output = model(
                 src=fr_batch,
                 tgt=en_batch,
                 tgt_mask=tgt_mask,
                 memory_mask=memory_mask,
             )
-            print_memory_stats(15)
 
             output = output.view(-1, vocab_size_en)
             loss = criterion(output, en_batch.view(-1))
 
             logging.info(f"Training Loss: {loss:.4f}")
-            print_memory_stats(16)
 
             loss.backward()
             optimizer.step()
@@ -635,10 +593,6 @@ for i in range(0, len(indices), chunk_size):
 
         with torch.no_grad():
             for fr_batch, en_batch in valid_loader:
-                batch_max_len = max(len(seq) for seq in fr_batch)
-                fr_batch = [seq[:batch_max_len] for seq in fr_batch]
-                en_batch = [seq[:batch_max_len] for seq in en_batch]
-
                 tgt_mask = (
                     torch.triu(torch.ones(en_batch.size(1), en_batch.size(1)))
                     .bool()
@@ -651,8 +605,7 @@ for i in range(0, len(indices), chunk_size):
                     .to(fr_batch.device)
                 )
 
-                output = checkpoint(
-                    model.forward,
+                output = model(
                     src=fr_batch,
                     tgt=en_batch,
                     tgt_mask=tgt_mask,
@@ -749,7 +702,6 @@ with open("metrics/metrics_epochs.json", "w") as f:
 
 
 # Example of model utilisation
-checkpoint = torch.load("models/checkpoint_last_epoch.pth", map_location="cpu")
 model.load_state_dict(checkpoint["model_state_dict"])
 model.eval()
 
