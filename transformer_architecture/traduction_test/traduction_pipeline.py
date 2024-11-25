@@ -304,8 +304,6 @@ gc.collect()
 
 logging.info("Dataset preprocessing is over")
 
-max_len = get_corpus_max_len(train_data_sample)
-
 
 class TransformerWithProjection(nn.Module):
     def __init__(
