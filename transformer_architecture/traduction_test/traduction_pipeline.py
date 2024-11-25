@@ -691,8 +691,8 @@ for i in range(0, len(indices), chunk_size):
             "models/checkpoint_last_epoch.pth",
         )
 
-        del train_loader
-        gc.collect()
+del train_loader
+gc.collect()
 
 os.makedirs("metrics", exist_ok=True)
 with open("metrics/metrics_epochs.json", "w") as f:
