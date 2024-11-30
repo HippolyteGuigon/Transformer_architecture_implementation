@@ -7,6 +7,7 @@ import pickle
 import json
 import logging
 import subprocess
+import time
 import os
 import gc
 from typing import List, Tuple, Optional
@@ -530,7 +531,7 @@ valid_loader = DataLoader(
 )
 
 indices = train_data_sample.indices
-chunk_size = 50000
+chunk_size = 15000
 
 for i in range(0, len(indices), chunk_size):
     chunk_indices = indices[i : i + chunk_size]
@@ -538,7 +539,7 @@ for i in range(0, len(indices), chunk_size):
     train_loader = DataLoader(
         chunk_subset,
         batch_size=batch_size,
-        collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=20),
+        collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=max_len),
     )
 
     del chunk_subset
@@ -549,6 +550,7 @@ for i in range(0, len(indices), chunk_size):
         total_loss = 0
 
         for fr_batch, en_batch in train_loader:
+            time_1 = time.time()
             torch.cuda.empty_cache()
             gc.collect()
 
@@ -578,7 +580,11 @@ for i in range(0, len(indices), chunk_size):
             optimizer.step()
 
             total_loss += loss.item()
+            time_2 = time.time()
 
+            logging.warning(
+                f"Time required for this batch: {time_2-time_1:.2f}"
+            )
         avg_train_loss = total_loss / len(train_loader)
         logging.warning(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
 
