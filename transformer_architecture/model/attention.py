@@ -83,70 +83,55 @@ class SelfAttention(Attention):
         value: Tensor,
         masking: bool = False,
     ) -> Tensor:
-        """
-        The goal of this method is to calculate
-        the self-attention scores for a given
-        embedding input
+      """
+      The goal of this method is to calculate
+      the self-attention scores for a given
+      embedding input
 
-        Arguments:
-            -key: Tensor: The key matrix of the
-            attention head
-            -query: Tensor: The query matix of the
-            attention head
-            -value: Tensor: The value matrix of the
-            attention head
-            -masking: bool: Wether the attention matrix
-            is masked
-        Returns:
-            -attention_score: Tensor: The attention
-            score output
-        """
+      Arguments:
+          -key: Tensor: The key matrix of the
+          attention head
+          -query: Tensor: The query matrix of the
+          attention head
+          -value: Tensor: The value matrix of the
+          attention head
+          -masking: bool: Whether the attention matrix
+          is masked
+      Returns:
+          -attention_score: Tensor: The attention
+          score output
+      """
 
-        time_1 = time.time()
+      time_1 = time.time()
 
-        if masking:
-            dot_product = torch.matmul(query, key.transpose(-2, -1))
-            dot_product = dot_product.to(device=device)
-            scaled_dot_product = dot_product / math.sqrt(self.d_k)
+      if masking:
+        mask_size = key.size(-2)
+        # Create the upper triangular mask
+        mask = torch.triu(
+            torch.ones(mask_size, mask_size, device=query.device),
+            diagonal=1
+        ).float() * float('-inf')  
 
-            mask_size = key.size(-2)
-            mask = torch.triu(
-                torch.ones(mask_size, mask_size), diagonal=1
-            ).bool()
-            mask = mask.to(device=device)
-            if not torch.is_floating_point(scaled_dot_product):
-                scaled_dot_product = scaled_dot_product.to(torch.float32)
+        mask = torch.where(torch.isnan(mask), torch.full_like(mask, -1e9), mask)
 
-            scaled_dot_product = scaled_dot_product.masked_fill(mask, -1e9)
-            attention_scores = softmax(scaled_dot_product, axis=-1)
-            attention_scores = torch.matmul(attention_scores, value)
-            attention_scores = attention_scores.to(device=device)
+        attention_scores = torch.nn.functional.scaled_dot_product_attention(
+            query.to(dtype=torch.float32),
+            key.to(dtype=torch.float32),
+            value.to(dtype=torch.float32),
+            attn_mask=mask
+        )
 
-        else:
-            attention_scores = scaled_dot_product_attention(query, key, value)
+      else:
+          attention_scores = torch.nn.functional.scaled_dot_product_attention(
+              query, key, value
+          )
 
-        # dot_product = torch.matmul(query, key.transpose(-2, -1))
+      time_2 = time.time()
 
-        # dot_product = dot_product.to(device=device)
+      logging.info(f"Attention computation time: {time_2 - time_1:.4f} seconds")
 
-        # scaled_dot_product = dot_product / math.sqrt(self.d_k)
+      return attention_scores
 
-        # if masking:
-        #     mask_size = key.size(-2)
-        #     mask = torch.triu(
-        #         torch.ones(mask_size, mask_size), diagonal=1
-        #     ).bool()
-        #     mask = mask.to(device=device)
-        #     if not torch.is_floating_point(scaled_dot_product):
-        #         scaled_dot_product = scaled_dot_product.to(torch.float32)
-
-        #     scaled_dot_product = scaled_dot_product.masked_fill(mask, -1e9)
-
-        # attention_scores = softmax(scaled_dot_product, axis=-1)
-        # attention_scores = torch.matmul(attention_scores, value)
-        # attention_scores = attention_scores.to(device=device)
-
-        return attention_scores
 
 
 class MultiHeadAttention(SelfAttention):

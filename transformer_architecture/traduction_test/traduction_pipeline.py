@@ -393,7 +393,6 @@ class TransformerWithProjection(nn.Module):
             tgt_mask=tgt_mask,
             memory_mask=memory_mask,
         )
-
         return self.projection(decoder_output)
 
 
@@ -485,7 +484,7 @@ model = TransformerWithProjection(
 ).to(device)
 
 optimizer = optim.Adam(
-    model.parameters_to_optimize, lr=learning_rate, weight_decay=1e-2
+    model.parameters_to_optimize, lr=learning_rate, weight_decay=1e-3
 )
 
 criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
