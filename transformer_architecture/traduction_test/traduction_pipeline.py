@@ -10,6 +10,7 @@ import subprocess
 import time
 import os
 import gc
+from google.colab import drive
 from typing import List, Tuple, Optional
 from torchtext.data.utils import get_tokenizer
 from torch.utils.data import DataLoader, random_split
@@ -403,93 +404,70 @@ def translate_sentence(
     vocab_en: torchtext.vocab.Vocab,
     tokenizer_fr: torchtext.data.utils,
     max_len: int,
-    device: str = "cpu",
+    device: torch.device = device,  # Utiliser le même `device` partout
 ) -> str:
-    """
-    Translates a French sentence into English using the
-    trained Transformer model.
-
-    Arguments:
-        - sentence: str: The French sentence to translate.
-        - model: TransformerWithProjection: The trained Transformer model.
-        - vocab_fr: Vocab: The vocabulary object for French.
-        - vocab_en: Vocab: The vocabulary object for English.
-        - tokenizer_fr: Tokenizer: The tokenizer for French.
-        - max_len: int: The maximum length of input sequences.
-        - device: str: The device to use for computation ('cpu' or 'cuda').
-
-    Returns:
-        - translated_sentence: str: The translated English sentence.
-    """
-    # Tokenize and encode the French sentence
+    # Tokenize et encode la phrase
     tokens = (
         [vocab_fr["<bos>"]]
         + [vocab_fr[token] for token in tokenizer_fr(sentence)]
         + [vocab_fr["<eos>"]]
     )
-    input_tensor = torch.tensor(
-        tokens, dtype=torch.long, device=device
-    ).unsqueeze(0)
+    input_tensor = (
+        torch.tensor(tokens, dtype=torch.long).unsqueeze(0).to(device)
+    )
 
-    # Ensure input_tensor matches max_len
+    # Padding ou troncature pour correspondre à max_len
     if input_tensor.size(1) < max_len:
         padding = torch.full(
             (1, max_len - input_tensor.size(1)),
             vocab_fr["<pad>"],
-            device=device,
             dtype=torch.long,
+            device=device,
         )
         input_tensor = torch.cat([input_tensor, padding], dim=1)
     elif input_tensor.size(1) > max_len:
         input_tensor = input_tensor[:, :max_len]
 
-    # Prepare the target tensor with just the <bos> token
+    # Préparer la séquence cible
     target_tensor = torch.tensor(
         [vocab_en["<bos>"]], dtype=torch.long, device=device
     ).unsqueeze(0)
 
+    input_tensor = input_tensor.to(device=device)
+    target_tensor = target_tensor.to(device=device)
+    # Traduction avec le modèle
     model.eval()
     with torch.no_grad():
         for _ in range(max_len):
-            # Add positional encoding to input tensor
-            input_tensor = input_tensor.to(device=device)
             src_emb = model.positionnal_encoding.add_positional_encoding(
-                model.embedder.embed(input_tensor)
+                model.embedder.embed(
+                    input_tensor.to(device=device)
+                )  # Déjà sur le bon appareil
             )
-
-            # Add positional encoding to target tensor dynamically
-            target_tensor = target_tensor.to(device=device)
-            tgt_emb = model.embedder.embed(target_tensor)
+            tgt_emb = model.embedder.embed(target_tensor.to(device=device))
             tgt_emb = tgt_emb + model.positionnal_encoding.pe[
                 : tgt_emb.size(1), :
             ].unsqueeze(0)
-
-            # Pass through the Transformer model
             encoder_output = model.encoder(src_emb)
             decoder_output = model.decoder(tgt=tgt_emb, memory=encoder_output)
             output_logits = model.projection(decoder_output)
 
-            # Get the next token prediction
             next_token = output_logits[:, -1, :].argmax(dim=-1).item()
-
-            # Append the predicted token to the target sequence
             target_tensor = torch.cat(
                 [target_tensor, torch.tensor([[next_token]], device=device)],
                 dim=1,
             )
 
-            # Stop if <eos> token is generated
             if next_token == vocab_en["<eos>"]:
                 break
 
-    # Decode the tokens into a sentence
+    # Décodage des tokens en phrase
     translated_tokens = target_tensor.squeeze().tolist()
     translated_sentence = " ".join(
         vocab_en.lookup_token(idx)
         for idx in translated_tokens
         if idx not in [vocab_en["<bos>"], vocab_en["<eos>"], vocab_en["<pad>"]]
     )
-
     return translated_sentence
 
 
@@ -506,7 +484,9 @@ model = TransformerWithProjection(
     learnable_encoding=False,
 ).to(device)
 
-optimizer = optim.Adam(model.parameters_to_optimize, lr=learning_rate)
+optimizer = optim.Adam(
+    model.parameters_to_optimize, lr=learning_rate, weight_decay=1e-2
+)
 
 criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
 
@@ -531,7 +511,7 @@ valid_loader = DataLoader(
 )
 
 indices = train_data_sample.indices
-chunk_size = 15000
+chunk_size = 50000
 
 for i in range(0, len(indices), chunk_size):
     chunk_indices = indices[i : i + chunk_size]
@@ -550,7 +530,6 @@ for i in range(0, len(indices), chunk_size):
         total_loss = 0
 
         for fr_batch, en_batch in train_loader:
-            time_1 = time.time()
             torch.cuda.empty_cache()
             gc.collect()
 
@@ -580,13 +559,36 @@ for i in range(0, len(indices), chunk_size):
             optimizer.step()
 
             total_loss += loss.item()
-            time_2 = time.time()
 
-            logging.warning(
-                f"Time required for this batch: {time_2-time_1:.2f}"
-            )
         avg_train_loss = total_loss / len(train_loader)
         logging.warning(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
+
+        sentence = [
+            "Le chat dort sur le canapé.",
+            "La fleur pousse dans le jardin.",
+            "Il fait beau aujourd'hui.",
+            "Marie lit un livre intéressant.",
+            "Le chien joue avec une balle.",
+            "Nous allons au marché ce matin.",
+            "Jean cuisine un délicieux repas.",
+            "L'enfant dessine avec des crayons de couleur.",
+            "Le soleil se couche derrière les montagnes.",
+            "Elle boit un verre d'eau fraîche.",
+        ]
+
+        for french_sentence in sentence:
+            translated_sentence = translate_sentence(
+                sentence=french_sentence,
+                model=model,
+                vocab_fr=vocab_fr,
+                vocab_en=vocab_en,
+                tokenizer_fr=tokenizer_fr,
+                max_len=max_len,
+                device="cuda",
+            )
+
+            print("French:", french_sentence)
+            print("English:", translated_sentence)
 
         model.eval()
         val_loss = 0
@@ -708,17 +710,3 @@ with open("metrics/metrics_epochs.json", "w") as f:
 # Example of model utilisation
 model.load_state_dict(checkpoint["model_state_dict"])
 model.eval()
-
-french_sentence = "Bonjour, comment allez-vous ?"
-translated_sentence = translate_sentence(
-    sentence=french_sentence,
-    model=model,
-    vocab_fr=vocab_fr,
-    vocab_en=vocab_en,
-    tokenizer_fr=tokenizer_fr,
-    max_len=max_len,
-    device="cpu",
-)
-
-print("French:", french_sentence)
-print("English:", translated_sentence)
