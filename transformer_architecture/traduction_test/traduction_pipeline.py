@@ -9,7 +9,6 @@ import logging
 import subprocess
 import os
 import gc
-from google.colab import drive
 from typing import List, Tuple, Optional
 from torchtext.data.utils import get_tokenizer
 from torch.utils.data import DataLoader, random_split
@@ -18,6 +17,9 @@ from logging.handlers import RotatingFileHandler
 from transformer_architecture.model.encoder import TransformerEncoderLayer
 from transformer_architecture.model.decoder import TransformerDecoderLayer
 from transformer_architecture.configs.confs import load_conf, clean_params
+from transformer_architecture.traduction_test.model_saving import (
+    upload_to_gcp_bucket,
+)
 from transformer_architecture.preprocessing.embedding import (
     Embedding,
     SinusoidalPositionalEncoding,
@@ -698,13 +700,11 @@ for i in range(0, len(indices), chunk_size):
             "models/checkpoint_last_epoch.pth",
         )
 
-        drive_path = f"TransformerModels/checkpoint_epoch_{epoch}.pth"
-        from google.colab import drive
-
-        drive.mount("/content/drive", force_remount=True)
-        drive_full_path = f"/content/drive/My Drive/{drive_path}"
-        os.makedirs(os.path.dirname(drive_full_path), exist_ok=True)
-        torch.save(model_state, drive_full_path)
+        upload_to_gcp_bucket(
+            local_file_path="models/checkpoint_last_epoch.pth",
+            bucket_name="french-english-raw-data",
+            destination_blob_name="checkpoint_last_epoch.pth",
+        )
 
 del train_loader
 gc.collect()
