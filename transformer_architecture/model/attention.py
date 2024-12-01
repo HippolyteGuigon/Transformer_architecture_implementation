@@ -1,13 +1,9 @@
-import math
 import torch
 import torch.nn as nn
-import time
-import logging
 
 from torch import Tensor
 from typing import Tuple
 from abc import ABC, abstractmethod
-from transformer_architecture.utils.activation import softmax
 from transformer_architecture.preprocessing.embedding import (
     RotaryPositionnalEmbedding,
 )
@@ -83,55 +79,41 @@ class SelfAttention(Attention):
         value: Tensor,
         masking: bool = False,
     ) -> Tensor:
-      """
-      The goal of this method is to calculate
-      the self-attention scores for a given
-      embedding input
+        """
+        The goal of this method is to calculate
+        the self-attention scores for a given
+        embedding input
 
-      Arguments:
-          -key: Tensor: The key matrix of the
-          attention head
-          -query: Tensor: The query matrix of the
-          attention head
-          -value: Tensor: The value matrix of the
-          attention head
-          -masking: bool: Whether the attention matrix
-          is masked
-      Returns:
-          -attention_score: Tensor: The attention
-          score output
-      """
+        Arguments:
+            -key: Tensor: The key matrix of the
+            attention head
+            -query: Tensor: The query matrix of the
+            attention head
+            -value: Tensor: The value matrix of the
+            attention head
+            -masking: bool: Whether the attention matrix
+            is masked
+        Returns:
+            -attention_score: Tensor: The attention
+            score output
+        """
 
-      time_1 = time.time()
+        if masking:
+            mask_size = key.size(-2)
 
-      if masking:
-        mask_size = key.size(-2)
-        # Create the upper triangular mask
-        mask = torch.triu(
-            torch.ones(mask_size, mask_size, device=query.device),
-            diagonal=1
-        ).float() * float('-inf')  
+            mask = torch.triu(
+                torch.full((mask_size, mask_size), -1e9, device=query.device),
+                diagonal=1,
+            )
 
-        mask = torch.where(torch.isnan(mask), torch.full_like(mask, -1e9), mask)
+            attention_scores = scaled_dot_product_attention(
+                query, key, value, attn_mask=mask
+            )
 
-        attention_scores = torch.nn.functional.scaled_dot_product_attention(
-            query.to(dtype=torch.float32),
-            key.to(dtype=torch.float32),
-            value.to(dtype=torch.float32),
-            attn_mask=mask
-        )
+        else:
+            attention_scores = scaled_dot_product_attention(query, key, value)
 
-      else:
-          attention_scores = torch.nn.functional.scaled_dot_product_attention(
-              query, key, value
-          )
-
-      time_2 = time.time()
-
-      logging.info(f"Attention computation time: {time_2 - time_1:.4f} seconds")
-
-      return attention_scores
-
+        return attention_scores
 
 
 class MultiHeadAttention(SelfAttention):

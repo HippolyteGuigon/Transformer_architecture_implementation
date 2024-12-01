@@ -7,7 +7,6 @@ import pickle
 import json
 import logging
 import subprocess
-import time
 import os
 import gc
 from google.colab import drive
@@ -510,7 +509,7 @@ valid_loader = DataLoader(
 )
 
 indices = train_data_sample.indices
-chunk_size = 50000
+chunk_size = 10000
 
 for i in range(0, len(indices), chunk_size):
     chunk_indices = indices[i : i + chunk_size]
@@ -687,16 +686,25 @@ for i in range(0, len(indices), chunk_size):
             f"Epoch {epoch}, Validation ROUGE-L Score: {avg_rouge_l}"
         )
 
+        model_state = {
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "train_loss": avg_train_loss,
+            "val_loss": avg_val_loss,
+        }
         torch.save(
-            {
-                "epoch": epoch,
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "train_loss": avg_train_loss,
-                "val_loss": avg_val_loss,
-            },
+            model_state,
             "models/checkpoint_last_epoch.pth",
         )
+
+        drive_path = f"TransformerModels/checkpoint_epoch_{epoch}.pth"
+        from google.colab import drive
+
+        drive.mount("/content/drive", force_remount=True)
+        drive_full_path = f"/content/drive/My Drive/{drive_path}"
+        os.makedirs(os.path.dirname(drive_full_path), exist_ok=True)
+        torch.save(model_state, drive_full_path)
 
 del train_loader
 gc.collect()
