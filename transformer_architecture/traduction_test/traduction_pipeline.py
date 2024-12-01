@@ -50,11 +50,6 @@ train_size = main_params["train_size"]
 nrows = main_params["nrows"]
 max_len = main_params["max_len"]
 
-download_file_from_gcs("french-english-raw-data","train_data_sample.pkl", "data/train_data_sample.pkl")
-download_file_from_gcs("french-english-raw-data","valid_data_sample.pkl", "data/valid_data_sample.pkl")
-download_file_from_gcs("french-english-raw-data","vocab_en.pkl", "data/vocab_en.pkl")
-download_file_from_gcs("french-english-raw-data","vocab_fr.pkl", "data/vocab_fr.pkl")
-
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
@@ -517,7 +512,7 @@ valid_loader = DataLoader(
 )
 
 indices = train_data_sample.indices
-chunk_size = 50000
+chunk_size = 10000
 
 for i in range(0, len(indices), chunk_size):
     chunk_indices = indices[i : i + chunk_size]
