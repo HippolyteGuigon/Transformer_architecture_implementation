@@ -7,6 +7,7 @@ import pickle
 import json
 import logging
 import subprocess
+import warnings
 import os
 import gc
 from typing import List, Tuple, Optional
@@ -18,7 +19,7 @@ from transformer_architecture.model.encoder import TransformerEncoderLayer
 from transformer_architecture.model.decoder import TransformerDecoderLayer
 from transformer_architecture.configs.confs import load_conf, clean_params
 from transformer_architecture.traduction_test.model_saving import (
-    upload_to_gcp_bucket,
+    upload_to_gcp_bucket, download_file_from_gcs
 )
 from transformer_architecture.preprocessing.embedding import (
     Embedding,
@@ -29,6 +30,8 @@ from torch.utils.data.dataset import Subset
 from torch.utils.checkpoint import checkpoint
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
+
+warnings.filterwarnings("ignore")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -46,6 +49,11 @@ batch_size = main_params["batch_size"]
 train_size = main_params["train_size"]
 nrows = main_params["nrows"]
 max_len = main_params["max_len"]
+
+download_file_from_gcs("french-english-raw-data","train_data_sample.pkl", "data/train_data_sample.pkl")
+download_file_from_gcs("french-english-raw-data","valid_data_sample.pkl", "data/valid_data_sample.pkl")
+download_file_from_gcs("french-english-raw-data","vocab_en.pkl", "data/vocab_en.pkl")
+download_file_from_gcs("french-english-raw-data","vocab_fr.pkl", "data/vocab_fr.pkl")
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -214,7 +222,6 @@ else:
 
     logging.info("Vocab succesfully built !")
 
-
 def tokenize_sentence_pair(
     item: pd.Series,
     vocab_fr: torchtext.vocab.Vocab,
@@ -306,7 +313,6 @@ del df
 gc.collect()
 
 logging.info("Dataset preprocessing is over")
-
 
 class TransformerWithProjection(nn.Module):
     def __init__(

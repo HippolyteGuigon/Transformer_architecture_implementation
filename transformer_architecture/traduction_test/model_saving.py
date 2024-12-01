@@ -30,7 +30,19 @@ def upload_to_gcp_bucket(
     )
 
 
-if __name__ == "__main__":
-    upload_to_gcp_bucket(
-        "models/bonjour.txt", "french-english-raw-data", "bonjour.txt"
-    )
+def download_file_from_gcs(bucket_name, blob_name, local_file_path):
+    """Télécharge un fichier depuis un bucket Google Cloud Storage"""
+    
+    # Crée un client de stockage
+    storage_client = storage.Client()
+
+    # Récupère le bucket
+    bucket = storage_client.get_bucket(bucket_name)
+    
+    # Récupère le blob (fichier) dans le bucket
+    blob = bucket.blob(blob_name)
+    
+    # Télécharge le fichier vers le chemin local
+    blob.download_to_filename(local_file_path)
+
+    print(f"Le fichier {blob_name} a été téléchargé dans {local_file_path}")
