@@ -517,7 +517,7 @@ valid_loader = DataLoader(
 )
 
 indices = train_data_sample.indices
-chunk_size = 10000
+chunk_size = 50000
 
 for i in range(0, len(indices), chunk_size):
     chunk_indices = indices[i : i + chunk_size]
