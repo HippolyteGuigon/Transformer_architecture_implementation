@@ -18,9 +18,7 @@ from logging.handlers import RotatingFileHandler
 from transformer_architecture.model.encoder import TransformerEncoderLayer
 from transformer_architecture.model.decoder import TransformerDecoderLayer
 from transformer_architecture.configs.confs import load_conf, clean_params
-from transformer_architecture.traduction_test.model_saving import (
-    upload_to_gcp_bucket,
-)
+
 from transformer_architecture.preprocessing.embedding import (
     Embedding,
     SinusoidalPositionalEncoding,
@@ -662,11 +660,6 @@ for epoch in range(num_epochs):
     torch.save(
         model_state,
         "models/checkpoint_last_epoch.pth",
-    )
-    upload_to_gcp_bucket(
-        local_file_path="models/checkpoint_last_epoch.pth",
-        bucket_name="french-english-raw-data",
-        destination_blob_name="checkpoint_last_epoch.pth",
     )
 
 del train_loader
