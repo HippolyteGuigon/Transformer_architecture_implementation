@@ -1,6 +1,8 @@
 learning_rate: 0.02
-num_epochs: 3
-embedding_dim: 8
-num_heads: 4
-batch_size: 16
-train_size: 0.8
+num_epochs: 10
+embedding_dim: 512
+num_heads: 16
+batch_size: 256
+train_size: 0.9
+max_len: 20
+chunk_size: 10000
