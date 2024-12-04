@@ -1,6 +1,5 @@
 #!/bin/bash
 
-export GOOGLE_APPLICATION_CREDENTIALS=french-english-traduction-auth.json
 pip install -r requirements.txt
 mkdir -p ~/.kaggle
 mv kaggle.json ~/.kaggle/
