@@ -497,6 +497,7 @@ os.makedirs("metrics", exist_ok=True)
 with open("metrics/metrics_epochs.json", "w") as f:
     json.dump(overall_metrics, f)
 
+checkpoint = torch.load("models/checkpoint_last_epoch.pth", map_location=device)
 
 model.load_state_dict(checkpoint["model_state_dict"])
 model.eval()
