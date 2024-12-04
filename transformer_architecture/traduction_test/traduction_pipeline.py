@@ -19,7 +19,7 @@ from transformer_architecture.model.encoder import TransformerEncoderLayer
 from transformer_architecture.model.decoder import TransformerDecoderLayer
 from transformer_architecture.configs.confs import load_conf, clean_params
 from transformer_architecture.traduction_test.model_saving import (
-    upload_to_gcp_bucket, download_file_from_gcs
+    upload_to_gcp_bucket,
 )
 from transformer_architecture.preprocessing.embedding import (
     Embedding,
@@ -90,6 +90,7 @@ logging.info("Filtering dataset...")
 df["sentence_length"] = df["fr"].apply(lambda x: len(x.split(" ")))
 df = df[df["sentence_length"] < max_len]
 df.drop("sentence_length", axis=1, inplace=True)
+df = df.sample(frac=1)
 logging.info(f"Succesfully filtered ! New shape of {df.shape[0]}")
 
 
@@ -217,6 +218,7 @@ else:
 
     logging.info("Vocab succesfully built !")
 
+
 def tokenize_sentence_pair(
     item: pd.Series,
     vocab_fr: torchtext.vocab.Vocab,
@@ -308,6 +310,7 @@ del df
 gc.collect()
 
 logging.info("Dataset preprocessing is over")
+
 
 class TransformerWithProjection(nn.Module):
     def __init__(
@@ -499,12 +502,6 @@ logging.info("Model training has begun")
 
 overall_metrics = {}
 
-# train_loader = DataLoader(
-#    train_data_sample,
-#    batch_size=batch_size,
-#    collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len),
-# )
-
 valid_loader = DataLoader(
     valid_data_sample,
     batch_size=batch_size,
@@ -514,21 +511,26 @@ valid_loader = DataLoader(
 indices = train_data_sample.indices
 chunk_size = 10000
 
-for i in range(0, len(indices), chunk_size):
-    chunk_indices = indices[i : i + chunk_size]
-    chunk_subset = Subset(train_data_sample.dataset, chunk_indices)
-    train_loader = DataLoader(
-        chunk_subset,
-        batch_size=batch_size,
-        collate_fn=lambda batch: pad_sentences(*zip(*batch), max_len=max_len),
-    )
+for epoch in range(num_epochs):
+    logging.info(f"Starting Epoch {epoch}")
+    total_loss = 0
 
-    del chunk_subset
-    gc.collect()
+    for i in range(0, len(indices), chunk_size):
+        # Charger un chunk à chaque itération
+        chunk_indices = indices[i : i + chunk_size]
+        chunk_subset = Subset(train_data_sample.dataset, chunk_indices)
+        train_loader = DataLoader(
+            chunk_subset,
+            batch_size=batch_size,
+            collate_fn=lambda batch: pad_sentences(
+                *zip(*batch), max_len=max_len
+            ),
+        )
 
-    for epoch in range(num_epochs):
+        del chunk_subset
+        gc.collect()
+
         model.train()
-        total_loss = 0
 
         for fr_batch, en_batch in train_loader:
             torch.cuda.empty_cache()
@@ -561,151 +563,148 @@ for i in range(0, len(indices), chunk_size):
 
             total_loss += loss.item()
 
-        avg_train_loss = total_loss / len(train_loader)
-        logging.warning(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
+    avg_train_loss = total_loss / len(
+        indices
+    )  # Normalisation par le nombre total d'échantillons
+    logging.warning(f"Epoch {epoch}, Training Loss: {avg_train_loss}")
 
-        sentence = [
-            "Le chat dort sur le canapé.",
-            "La fleur pousse dans le jardin.",
-            "Il fait beau aujourd'hui.",
-            "Marie lit un livre intéressant.",
-            "Le chien joue avec une balle.",
-            "Nous allons au marché ce matin.",
-            "Jean cuisine un délicieux repas.",
-            "L'enfant dessine avec des crayons de couleur.",
-            "Le soleil se couche derrière les montagnes.",
-            "Elle boit un verre d'eau fraîche.",
-        ]
+    # Evaluation après chaque epoch
+    sentence = [
+        "Le chat dort sur le canapé.",
+        "La fleur pousse dans le jardin.",
+        "Il fait beau aujourd'hui.",
+        "Marie lit un livre intéressant.",
+        "Le chien joue avec une balle.",
+        "Nous allons au marché ce matin.",
+        "Jean cuisine un délicieux repas.",
+        "L'enfant dessine avec des crayons de couleur.",
+        "Le soleil se couche derrière les montagnes.",
+        "Elle boit un verre d'eau fraîche.",
+    ]
 
-        for french_sentence in sentence:
-            translated_sentence = translate_sentence(
-                sentence=french_sentence,
-                model=model,
-                vocab_fr=vocab_fr,
-                vocab_en=vocab_en,
-                tokenizer_fr=tokenizer_fr,
-                max_len=max_len,
-                device="cuda",
+    for french_sentence in sentence:
+        translated_sentence = translate_sentence(
+            sentence=french_sentence,
+            model=model,
+            vocab_fr=vocab_fr,
+            vocab_en=vocab_en,
+            tokenizer_fr=tokenizer_fr,
+            max_len=max_len,
+            device="cuda",
+        )
+
+        print("French:", french_sentence)
+        print("English:", translated_sentence)
+
+    model.eval()
+    val_loss = 0
+    total_bleu = 0
+    total_rouge_1 = 0
+    total_rouge_l = 0
+    num_samples = 0
+
+    with torch.no_grad():
+        for fr_batch, en_batch in valid_loader:
+            tgt_mask = (
+                torch.triu(torch.ones(en_batch.size(1), en_batch.size(1)))
+                .bool()
+                .to(fr_batch.device)
+            )
+            memory_mask = (
+                (fr_batch == vocab_fr["<pad>"])
+                .transpose(0, 1)
+                .bool()
+                .to(fr_batch.device)
             )
 
-            print("French:", french_sentence)
-            print("English:", translated_sentence)
+            output = model(
+                src=fr_batch,
+                tgt=en_batch,
+                tgt_mask=tgt_mask,
+                memory_mask=memory_mask,
+            )
 
-        model.eval()
-        val_loss = 0
-        total_bleu = 0
-        total_rouge_1 = 0
-        total_rouge_l = 0
-        num_samples = 0
+            output = output.view(-1, vocab_size_en)
+            loss = criterion(output, en_batch.view(-1))
+            val_loss += loss.item()
 
-        with torch.no_grad():
-            for fr_batch, en_batch in valid_loader:
-                tgt_mask = (
-                    torch.triu(torch.ones(en_batch.size(1), en_batch.size(1)))
-                    .bool()
-                    .to(fr_batch.device)
-                )
-                memory_mask = (
-                    (fr_batch == vocab_fr["<pad>"])
-                    .transpose(0, 1)
-                    .bool()
-                    .to(fr_batch.device)
-                )
+            output_tokens = (
+                output.argmax(dim=-1).view(en_batch.size()).tolist()
+            )
+            target_tokens = en_batch.tolist()
 
-                output = model(
-                    src=fr_batch,
-                    tgt=en_batch,
-                    tgt_mask=tgt_mask,
-                    memory_mask=memory_mask,
-                )
-
-                output = output.view(-1, vocab_size_en)
-                loss = criterion(output, en_batch.view(-1))
-                val_loss += loss.item()
-
-                output_tokens = (
-                    output.argmax(dim=-1).view(en_batch.size()).tolist()
-                )
-                target_tokens = en_batch.tolist()
-
-                for output_seq, target_seq in zip(
-                    output_tokens, target_tokens
-                ):
-                    output_seq = [
-                        vocab_en.lookup_token(idx)
-                        for idx in output_seq
-                        if idx
-                        not in [
-                            vocab_en["<bos>"],
-                            vocab_en["<eos>"],
-                            vocab_en["<pad>"],
-                        ]
+            for output_seq, target_seq in zip(output_tokens, target_tokens):
+                output_seq = [
+                    vocab_en.lookup_token(idx)
+                    for idx in output_seq
+                    if idx
+                    not in [
+                        vocab_en["<bos>"],
+                        vocab_en["<eos>"],
+                        vocab_en["<pad>"],
                     ]
-                    target_seq = [
-                        vocab_en.lookup_token(idx)
-                        for idx in target_seq
-                        if idx
-                        not in [
-                            vocab_en["<bos>"],
-                            vocab_en["<eos>"],
-                            vocab_en["<pad>"],
-                        ]
+                ]
+                target_seq = [
+                    vocab_en.lookup_token(idx)
+                    for idx in target_seq
+                    if idx
+                    not in [
+                        vocab_en["<bos>"],
+                        vocab_en["<eos>"],
+                        vocab_en["<pad>"],
                     ]
+                ]
 
-                    bleu_score = sentence_bleu([target_seq], output_seq)
-                    total_bleu += bleu_score
+                bleu_score = sentence_bleu([target_seq], output_seq)
+                total_bleu += bleu_score
 
-                    rouge_scores = scorer_rouge.score(
-                        " ".join(target_seq), " ".join(output_seq)
-                    )
-                    total_rouge_1 += rouge_scores["rouge1"].fmeasure
-                    total_rouge_l += rouge_scores["rougeL"].fmeasure
+                rouge_scores = scorer_rouge.score(
+                    " ".join(target_seq), " ".join(output_seq)
+                )
+                total_rouge_1 += rouge_scores["rouge1"].fmeasure
+                total_rouge_l += rouge_scores["rougeL"].fmeasure
 
-                    num_samples += 1
+                num_samples += 1
 
-        avg_val_loss = val_loss / len(valid_loader)
-        avg_bleu = total_bleu / num_samples
-        avg_rouge_1 = total_rouge_1 / num_samples
-        avg_rouge_l = total_rouge_l / num_samples
+    avg_val_loss = val_loss / len(valid_loader)
+    avg_bleu = total_bleu / num_samples
+    avg_rouge_1 = total_rouge_1 / num_samples
+    avg_rouge_l = total_rouge_l / num_samples
 
-        metrics = {
-            "epoch": epoch,
-            "train_loss": avg_train_loss,
-            "val_loss": avg_val_loss,
-            "bleu_score": avg_bleu,
-            "rouge1_score": avg_rouge_1,
-            "rougeL_score": avg_rouge_l,
-        }
+    metrics = {
+        "epoch": epoch,
+        "train_loss": avg_train_loss,
+        "val_loss": avg_val_loss,
+        "bleu_score": avg_bleu,
+        "rouge1_score": avg_rouge_1,
+        "rougeL_score": avg_rouge_l,
+    }
 
-        epoch_key = f"epoch_{epoch}"
-        overall_metrics[epoch_key] = metrics
+    epoch_key = f"epoch_{epoch}"
+    overall_metrics[epoch_key] = metrics
 
-        logging.warning(f"Epoch {epoch}, Validation Loss: {avg_val_loss}")
-        logging.warning(f"Epoch {epoch}, Validation BLEU Score: {avg_bleu}")
-        logging.warning(
-            f"Epoch {epoch}, Validation ROUGE-1 Score: {avg_rouge_1}"
-        )
-        logging.warning(
-            f"Epoch {epoch}, Validation ROUGE-L Score: {avg_rouge_l}"
-        )
+    logging.warning(f"Epoch {epoch}, Validation Loss: {avg_val_loss}")
+    logging.warning(f"Epoch {epoch}, Validation BLEU Score: {avg_bleu}")
+    logging.warning(f"Epoch {epoch}, Validation ROUGE-1 Score: {avg_rouge_1}")
+    logging.warning(f"Epoch {epoch}, Validation ROUGE-L Score: {avg_rouge_l}")
 
-        model_state = {
-            "epoch": epoch,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "train_loss": avg_train_loss,
-            "val_loss": avg_val_loss,
-        }
-        torch.save(
-            model_state,
-            "models/checkpoint_last_epoch.pth",
-        )
-
-        upload_to_gcp_bucket(
-            local_file_path="models/checkpoint_last_epoch.pth",
-            bucket_name="french-english-raw-data",
-            destination_blob_name="checkpoint_last_epoch.pth",
-        )
+    model_state = {
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "train_loss": avg_train_loss,
+        "val_loss": avg_val_loss,
+        "metrics": metrics,
+    }
+    torch.save(
+        model_state,
+        "models/checkpoint_last_epoch.pth",
+    )
+    upload_to_gcp_bucket(
+        local_file_path="models/checkpoint_last_epoch.pth",
+        bucket_name="french-english-raw-data",
+        destination_blob_name="checkpoint_last_epoch.pth",
+    )
 
 del train_loader
 gc.collect()
