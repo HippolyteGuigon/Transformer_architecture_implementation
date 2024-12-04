@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 from torch import Tensor
 from typing import Tuple
@@ -7,6 +8,8 @@ from abc import ABC, abstractmethod
 from transformer_architecture.preprocessing.embedding import (
     RotaryPositionnalEmbedding,
 )
+
+from transformer_architecture.utils.activation import softmax
 
 from torch.nn.functional import scaled_dot_product_attention
 
@@ -71,6 +74,7 @@ class SelfAttention(Attention):
 
     def __init__(self) -> None:
         super().__init__()
+        self.device = device
 
     def forward(
         self,
@@ -98,20 +102,47 @@ class SelfAttention(Attention):
             score output
         """
 
-        if masking:
-            mask_size = key.size(-2)
+        if self.device == "cuda":
+            if masking:
+                mask_size = key.size(-2)
 
-            mask = torch.triu(
-                torch.full((mask_size, mask_size), -1e9, device=query.device),
-                diagonal=1,
-            )
+                mask = torch.triu(
+                    torch.full(
+                        (mask_size, mask_size), -1e9, device=query.device
+                    ),
+                    diagonal=1,
+                )
 
-            attention_scores = scaled_dot_product_attention(
-                query, key, value, attn_mask=mask
-            )
+                attention_scores = scaled_dot_product_attention(
+                    query, key, value, attn_mask=mask
+                )
+
+            else:
+                attention_scores = scaled_dot_product_attention(
+                    query, key, value
+                )
 
         else:
-            attention_scores = scaled_dot_product_attention(query, key, value)
+            dot_product = torch.matmul(query, key.transpose(-2, -1))
+
+            dot_product = dot_product.to(device=device)
+
+            scaled_dot_product = dot_product / math.sqrt(self.d_k)
+
+            if masking:
+                mask_size = key.size(-2)
+                mask = torch.triu(
+                    torch.ones(mask_size, mask_size), diagonal=1
+                ).bool()
+                mask = mask.to(device=device)
+                if not torch.is_floating_point(scaled_dot_product):
+                    scaled_dot_product = scaled_dot_product.to(torch.float32)
+
+                scaled_dot_product = scaled_dot_product.masked_fill(mask, -1e9)
+
+            attention_scores = softmax(scaled_dot_product, axis=-1)
+            attention_scores = torch.matmul(attention_scores, value)
+            attention_scores = attention_scores.to(device=device)
 
         return attention_scores
 
