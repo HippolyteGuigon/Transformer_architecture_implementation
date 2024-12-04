@@ -47,6 +47,7 @@ batch_size = main_params["batch_size"]
 train_size = main_params["train_size"]
 nrows = main_params["nrows"]
 max_len = main_params["max_len"]
+chunk_size = main_params["chunk_size"]
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -501,7 +502,6 @@ valid_loader = DataLoader(
 )
 
 indices = train_data_sample.indices
-chunk_size = 10000
 
 for epoch in range(num_epochs):
     logging.info(f"Starting Epoch {epoch}")
