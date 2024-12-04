@@ -6,7 +6,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "french-english-traduction.json"
 
 def upload_to_gcp_bucket(
     local_file_path: str, bucket_name: str, destination_blob_name: str
-)->None:
+) -> None:
     """
     Upload a file to a GCP bucket.
 
@@ -32,19 +32,30 @@ def upload_to_gcp_bucket(
     )
 
 
-def download_file_from_gcs(bucket_name, blob_name, local_file_path):
-    """Télécharge un fichier depuis un bucket Google Cloud Storage"""
-    
-    # Crée un client de stockage
+def download_file_from_gcs(
+    bucket_name: str, blob_name: str, local_file_path: str
+) -> None:
+    """
+    Downloads a file from a Google Cloud Storage bucket to a local path.
+
+    Arguments:
+        - bucket_name: str: The name of the Google
+        Cloud Storage bucket.
+        - blob_name: str: The name of the blob (file)
+        in the bucket.
+        - local_file_path: str: The local path where the
+        file will be downloaded.
+
+    Returns:
+        - None
+    """
+
     storage_client = storage.Client()
 
-    # Récupère le bucket
     bucket = storage_client.get_bucket(bucket_name)
-    
-    # Récupère le blob (fichier) dans le bucket
+
     blob = bucket.blob(blob_name)
-    
-    # Télécharge le fichier vers le chemin local
+
     blob.download_to_filename(local_file_path)
 
-    print(f"Le fichier {blob_name} a été téléchargé dans {local_file_path}")
+    print(f"The file '{blob_name}' has been downloaded to '{local_file_path}'")
