@@ -93,7 +93,16 @@ df = df.sample(frac=1)
 logging.info(f"Succesfully filtered ! New shape of {df.shape[0]}")
 
 
-def print_memory_stats(stage):
+def print_memory_stats(stage: str) -> None:
+    """
+    Prints the GPU memory usage statistics at a specific stage of execution.
+
+    Arguments:
+        - stage: str: The name or description of the stage being monitored.
+
+    Returns:
+        - None
+    """
     allocated = torch.cuda.memory_allocated() / 1e9
     reserved = torch.cuda.memory_reserved() / 1e9
     free = torch.cuda.get_device_properties(0).total_memory / 1e9 - reserved
@@ -409,6 +418,21 @@ def translate_sentence(
     max_len: int,
     device: torch.device = device,
 ) -> str:
+    """
+    Translates a French sentence into English using the Transformer model.
+
+    Arguments:
+        - sentence: str: The French sentence to be translated.
+        - model: TransformerWithProjection: The trained Transformer model.
+        - vocab_fr: torchtext.vocab.Vocab: The vocabulary for French.
+        - vocab_en: torchtext.vocab.Vocab: The vocabulary for English.
+        - tokenizer_fr: torchtext.data.utils: The tokenizer for French sentences.
+        - max_len: int: The maximum length of the output sequence.
+        - device: torch.device: The device to perform computations on (default: cuda or cpu).
+
+    Returns:
+        - str: The translated English sentence.
+    """
     tokens = (
         [vocab_fr["<bos>"]]
         + [vocab_fr[token] for token in tokenizer_fr(sentence)]
