@@ -17,7 +17,6 @@ from torchtext.vocab import build_vocab_from_iterator
 from logging.handlers import RotatingFileHandler
 
 from torch.utils.data.dataset import Subset
-from torch.utils.checkpoint import checkpoint
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
 
@@ -46,6 +45,7 @@ train_size = main_params["train_size"]
 nrows = main_params["nrows"]
 max_len = main_params["max_len"]
 chunk_size = main_params["chunk_size"]
+weight_decay = main_params["weight_decay"]
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -312,7 +312,7 @@ model = TransformerWithProjection(
 ).to(device)
 
 optimizer = optim.Adam(
-    model.parameters_to_optimize, lr=learning_rate, weight_decay=1e-3
+    model.parameters_to_optimize, lr=learning_rate, weight_decay=weight_decay
 )
 
 criterion = nn.CrossEntropyLoss(ignore_index=vocab_en["<pad>"])
@@ -497,7 +497,9 @@ os.makedirs("metrics", exist_ok=True)
 with open("metrics/metrics_epochs.json", "w") as f:
     json.dump(overall_metrics, f)
 
-checkpoint = torch.load("models/checkpoint_last_epoch.pth", map_location=device)
+checkpoint = torch.load(
+    "models/checkpoint_last_epoch.pth", map_location=device
+)
 
 model.load_state_dict(checkpoint["model_state_dict"])
 model.eval()
