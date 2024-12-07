@@ -21,6 +21,9 @@ from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
 
 from transformer_architecture.configs.confs import load_conf, clean_params
+from transformer_architecture.traduction_test.text_preprocessing import (
+    preprocess_translation_data,
+)
 from transformer_architecture.traduction_test.utils import (
     TransformerWithProjection,
     translate_sentence,
@@ -88,6 +91,8 @@ df["sentence_length"] = df["fr"].apply(lambda x: len(x.split(" ")))
 df = df[df["sentence_length"] < max_len]
 df.drop("sentence_length", axis=1, inplace=True)
 df = df.sample(frac=1)
+df["en"] = df["en"].apply(lambda x: preprocess_translation_data(x.split(" ")))
+df["fr"] = df["fr"].apply(lambda x: preprocess_translation_data(x.split(" ")))
 logging.info(f"Succesfully filtered ! New shape of {df.shape[0]}")
 
 
