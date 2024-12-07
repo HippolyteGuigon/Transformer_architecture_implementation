@@ -83,4 +83,7 @@ def preprocess_translation_data(texts: List[str]) -> List[str]:
         )
         for line in texts
     ]
+
+    preprocessed_texts=" ".join(preprocessed_texts)
+    
     return preprocessed_texts
